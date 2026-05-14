@@ -1,0 +1,61 @@
+# 本地调研资料
+research/
+
+# 依赖
+node_modules/
+
+# 构建产物
+# dist/ 由 npm run build 生成，不是源码事实。
+dist/
+*.tsbuildinfo
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 运行时数据
+pids/
+*.pid
+*.seed
+*.fifo
+
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 环境变量和密钥
+.env
+.env.*
+.claude/settings.json
+.claude/*.local.json
+*.pem
+*.key
+secrets/
+credentials/
+
+# 测试覆盖率
+coverage/
+.nyc_output/
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 锁文件（保留 npm 的 package-lock.json）
+yarn.lock
+bun.lock

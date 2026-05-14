@@ -1,0 +1,19 @@
+{
+  "name": "claude-hud-plus",
+  "owner": {
+    "name": "Dec27-Lee"
+  },
+  "metadata": {
+    "description": "增强型 Claude Code 状态栏 HUD：显示 API 路由后的真实模型、长会话诊断信息，并提升多终端显示稳定性。",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "claude-hud-plus",
+      "source": "./",
+      "description": "增强型状态栏：显示上下文用量、工具活动和 API 路由后的真实模型信息。",
+      "category": "monitoring",
+      "tags": ["hud", "statusline", "monitoring", "context", "tools", "agents", "todos"]
+    }
+  ]
+}
