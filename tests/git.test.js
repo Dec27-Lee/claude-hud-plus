@@ -328,7 +328,12 @@ test('getGitStatus attaches line diffs to renamed files with shared directory pr
   }
 });
 
-test('getGitStatus keeps line diffs for literal filenames containing arrow text', async () => {
+test('getGitStatus keeps line diffs for literal filenames containing arrow text', async (t) => {
+  if (process.platform === 'win32') {
+    t.skip('Windows file names cannot contain >');
+    return;
+  }
+
   const dir = await mkdtemp(path.join(tmpdir(), 'claude-hud-git-'));
   try {
     execFileSync('git', ['init'], { cwd: dir, stdio: 'ignore' });

@@ -110,7 +110,7 @@ async function withDeterministicSpeedCache(fn) {
   const transcriptPath = path.join(tempConfigDir, 'session.jsonl');
   await writeFile(transcriptPath, '', 'utf8');
   const transcriptHash = createHash('sha256').update(path.resolve(transcriptPath)).digest('hex');
-  const cachePath = path.join(tempConfigDir, 'plugins', 'claude-hud', 'speed-cache', `${transcriptHash}.json`);
+  const cachePath = path.join(tempConfigDir, 'plugins', 'claude-hud-plus', 'speed-cache', `${transcriptHash}.json`);
 
   process.env.CLAUDE_CONFIG_DIR = tempConfigDir;
   await mkdir(path.dirname(cachePath), { recursive: true });

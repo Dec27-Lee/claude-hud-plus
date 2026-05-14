@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { DEFAULT_CONFIG } from "../dist/config.js";
 import { setLanguage } from "../dist/i18n/index.js";
 import { formatSessionDuration, main } from "../dist/index.js";
@@ -77,7 +78,7 @@ function makeCounts(overrides = {}) {
 
 async function createTempConfigDir(config = {}) {
   const dir = await mkdtemp(path.join(tmpdir(), "claude-hud-index-test-"));
-  const pluginDir = path.join(dir, "plugins", "claude-hud");
+  const pluginDir = path.join(dir, "plugins", "claude-hud-plus");
   await mkdir(pluginDir, { recursive: true });
   await writeFile(
     path.join(pluginDir, "config.json"),
@@ -130,7 +131,7 @@ test("main logs an error when dependencies throw", async () => {
     log: (...args) => logs.push(args.join(" ")),
   });
 
-  assert.ok(logs.some((line) => line.includes("[claude-hud] Error:")));
+  assert.ok(logs.some((line) => line.includes("[claude-hud-plus] Error:")));
 });
 
 test("main logs unknown error for non-Error throws", async () => {
@@ -158,7 +159,7 @@ test("index entrypoint runs when executed directly", async () => {
     process.env.CLAUDE_CONFIG_DIR = dir;
     setLanguage("en");
     const moduleUrl = new URL("../dist/index.js", import.meta.url);
-    process.argv[1] = new URL(moduleUrl).pathname;
+    process.argv[1] = fileURLToPath(moduleUrl);
     Object.defineProperty(process.stdin, "isTTY", {
       value: true,
       configurable: true,
@@ -177,7 +178,7 @@ test("index entrypoint runs when executed directly", async () => {
     await cleanup();
   }
 
-  assert.ok(logs.some((line) => line.includes("[claude-hud] Initializing...")));
+  assert.ok(logs.some((line) => line.includes("[claude-hud-plus] Initializing...")));
 });
 
 test("main executes the happy path", async () => {

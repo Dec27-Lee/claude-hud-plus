@@ -109,7 +109,7 @@ test('getClaudeCodeVersion persists cache across process resets under CLAUDE_CON
     assert.equal(execCalls, 1);
     assert.equal(resolveCalls, 1);
 
-    const cachePath = path.join(customConfigDir, 'plugins', 'claude-hud', '.claude-code-version-cache.json');
+    const cachePath = path.join(customConfigDir, 'plugins', 'claude-hud-plus', '.claude-code-version-cache.json');
     assert.equal(existsSync(cachePath), true);
 
     _resetVersionCache();
@@ -217,7 +217,7 @@ test('getClaudeCodeVersion refreshes when the Claude binary mtime changes', asyn
 test('getClaudeCodeVersion executes the resolved binary path', async () => {
   const tempHome = await mkdtemp(path.join(tmpdir(), 'claude-hud-version-windows-'));
   const customConfigDir = path.join(tempHome, '.claude-alt');
-  const binaryPath = path.join(tempHome, 'claude.cmd');
+  const binaryPath = path.join(tempHome, 'claude.exe');
   const originalHome = process.env.HOME;
   const originalConfigDir = process.env.CLAUDE_CONFIG_DIR;
   const execCalls = [];
