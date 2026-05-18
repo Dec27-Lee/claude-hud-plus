@@ -4,10 +4,7 @@ Claude HUD Plus 是一个基于官方 Claude HUD 的增强型 Claude Code 状态
 
 一个 Claude Code 插件，实时显示正在发生的事情——上下文使用率、活跃工具、运行中的 Agent 和待办进度。始终在你的输入下方可见。
 
-[![License](https://img.shields.io/github/license/Dec27-Lee/claude-hud-plus?v=2)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Dec27-Lee/claude-hud-plus)](https://github.com/Dec27-Lee/claude-hud-plus/stargazers)
-
-![Claude HUD 运行效果](claude-hud-preview-5-2.png)
+<img width="1846" height="1321" alt="image" src="https://github.com/user-attachments/assets/da2f766a-d5f2-4011-a3a4-e79dac192e96" />
 
 > 🌐 [英文 README](README.md) | 中文文档
 
