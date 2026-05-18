@@ -17,7 +17,7 @@ Claude HUD Plus keeps the upstream Claude HUD codebase as its baseline, then add
 - **Context window override**: set `CLAUDE_HUD_CONTEXT_WINDOW_SIZE=270000` or another positive integer to override the displayed context window size and recompute usage percentage.
 - **Terminal width stability**: terminal width is detected dynamically by default; configure `maxWidth` / `forceMaxWidth` only when detection is unreliable or you want a fixed render width.
 
-Routed model display does not require a manual enable/disable switch. The HUD compares Claude Code's current request URL with the CCR listener in `~/.claude-code-router/config.json`; it only reads the current session's router model state when the current session is confirmed to be using CCR. If CCR is in use but the session state file is missing, the model component shows `CCR model hook missing: run /claude-hud-plus:setup` instead of misleadingly showing Claude Code's requested model as the routed model.
+Routed model display does not require a manual enable/disable switch. The HUD compares Claude Code's current request URL with the CCR listener in `~/.claude-code-router/config.json`; it only reads the current session's router model state when the current session is confirmed to be using CCR. Before the first routed request in a fresh session, the model component shows `Routing...`; after token activity begins, a missing session state file shows `CCR model hook missing: run /claude-hud-plus:setup` instead of misleadingly showing Claude Code's requested model as the routed model.
 
 Optional environment variables:
 
@@ -102,24 +102,19 @@ Claude HUD gives you better insights into what's happening in your Claude Code s
 
 ## What You See
 
-### Default (3 configurable rows)
+### Default (4 configurable rows)
 ```
-[Opus] █████░░░░░ 45% (90k/200k)
+[Opus] █████░░░░░ 45% (90k/270k)
 my-project git:(main*)
 Tokens 145.2M (in: 11.4M, out: 378k, cache: 133.4M)
+◐ Edit: auth.ts | ◐ explore [haiku]: Finding auth code | ▸ Fix authentication bug (2/5)
 ```
 - **Line 1** — Model, context bar, and context value
 - **Line 2** — Project path, added workspace directories, and git branch (when no `/add-dir` entries exist, only project + Git are shown)
 - **Line 3** — Cumulative session tokens
+- **Line 4** — Tool activity, Agent status, and todo progress when active
 
-The layout is defined by `rows` in `config.json`, so you can choose how many lines to render and which components appear on each line. Claude Code's native permission-mode prompt, such as bypass permissions, is not rendered by the HUD.
-
-### Optional lines (enable via `/claude-hud-plus:configure`)
-```
-◐ Edit: auth.ts | ✓ Read ×3 | ✓ Grep ×2        ← Tools activity
-◐ explore [haiku]: Finding auth code (2m 15s)    ← Agent status
-▸ Fix authentication bug (2/5)                   ← Todo progress
-```
+The layout is defined by `rows` in `config.json`, so you can choose how many lines to render and which components appear on each line. Claude Code's native permission-mode prompt, such as bypass permissions, is not rendered by the HUD. The default Plus profile keeps usage limits hidden; enable `display.showUsage` if you want to show subscriber usage data.
 
 ---
 
@@ -179,7 +174,7 @@ Chinese HUD labels are available as an explicit opt-in. English stays the defaul
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `language` | `en` \| `zh` | `en` | HUD label language. English is the default; set `zh` to enable Chinese labels. |
-| `rows` | string[][] | `[["model","contextBar","contextValue"],["project","addedDirs","git"],["sessionTokens"]]` | HUD row layout. The outer array defines lines; each inner array defines components on that line. |
+| `rows` | string[][] | `[["model","contextBar","contextValue"],["project","addedDirs","git"],["sessionTokens"],["tools","agents","todos"]]` | HUD row layout. The outer array defines lines; each inner array defines components on that line. |
 | `rowOverflow` | `truncate` \| `wrap` | `truncate` | Truncate overlong rows, or wrap at supported separator boundaries. |
 | `pathLevels` | 1-3 | 1 | Directory levels to show in project path |
 | `maxWidth` | number \| `null` | `null` | Optional fallback width used only when terminal width detection fails completely |
@@ -203,7 +198,7 @@ Chinese HUD labels are available as an explicit opt-in. English stays the defaul
 | `display.showOutputStyle` | boolean | false | Show the active Claude Code `outputStyle` from settings files as `style: <name>` |
 | `display.showDuration` | boolean | false | Show session duration `⏱️ 5m` |
 | `display.showSpeed` | boolean | false | Show output token speed `out: 42.1 tok/s` |
-| `display.showUsage` | boolean | true | Show Claude subscriber usage limits when available |
+| `display.showUsage` | boolean | false | Show Claude subscriber usage limits when available |
 | `display.usageValue` | `percent` \| `remaining` | `percent` | Usage display format (`25%` used, or `75%` remaining) |
 | `display.usageBarEnabled` | boolean | true | Display usage as visual bar instead of text |
 | `display.usageCompact` | boolean | false | Display usage in a shorter text form such as `5h: 25% (1h 30m)`; takes precedence over `display.usageBarEnabled` |
@@ -213,9 +208,9 @@ Chinese HUD labels are available as an explicit opt-in. English stays the defaul
 | `display.externalUsagePath` | string | `""` | Optional path to a local usage snapshot file used only when stdin `rate_limits` are missing |
 | `display.externalUsageFreshnessMs` | number | `300000` | Maximum allowed age for the external usage snapshot before it is ignored |
 | `display.showTokenBreakdown` | boolean | true | Show token details at high context (85%+) |
-| `display.showTools` | boolean | false | Show tools activity line |
-| `display.showAgents` | boolean | false | Show agents activity line |
-| `display.showTodos` | boolean | false | Show todos progress line |
+| `display.showTools` | boolean | true | Show tools activity line |
+| `display.showAgents` | boolean | true | Show agents activity line |
+| `display.showTodos` | boolean | true | Show todos progress line |
 | `display.showSessionName` | boolean | false | Show session slug or custom title from `/rename` |
 | `display.showSessionTokens` | boolean | true | Show cumulative session tokens; the default third row uses this component |
 | `display.showSessionStartDate` | boolean | false | Show the transcript session start timestamp |
@@ -224,23 +219,25 @@ Chinese HUD labels are available as an explicit opt-in. English stays the defaul
 | `display.showMemoryUsage` | boolean | false | Show an approximate system RAM usage row when `"memory"` is included in `rows` |
 | `display.showPromptCache` | boolean | false | Show a prompt cache countdown based on the last assistant response timestamp in the transcript |
 | `display.promptCacheTtlSeconds` | number | `300` | Prompt cache TTL in seconds. Keep the default for Pro, set `3600` for Max |
-| `colors.context` | color value | `green` | Base color for the context bar and context percentage |
+| `colors.context` | color value | `#22D3EE` | Base color for the context bar and context percentage |
 | `colors.usage` | color value | `brightBlue` | Base color for usage bars and percentages below warning thresholds |
-| `colors.warning` | color value | `yellow` | Warning color for context thresholds and usage warning text |
+| `colors.warning` | color value | `#F59E0B` | Warning color for context thresholds and usage warning text |
 | `colors.usageWarning` | color value | `brightMagenta` | Warning color for usage bars and percentages near their threshold |
-| `colors.critical` | color value | `red` | Critical color for limit-reached states and critical thresholds |
-| `colors.model` | color value | `cyan` | Color for the model badge such as `[Opus]` |
-| `colors.project` | color value | `yellow` | Color for the project path |
-| `colors.git` | color value | `magenta` | Color for git wrapper text such as `git:(` and `)` |
-| `colors.gitBranch` | color value | `cyan` | Color for the git branch and branch status text |
+| `colors.critical` | color value | `#F43F5E` | Critical color for limit-reached states and critical thresholds |
+| `colors.model` | color value | `#38BDF8` | Color for the model badge such as `[Opus]` |
+| `colors.project` | color value | `#FBBF24` | Color for the project path |
+| `colors.git` | color value | `#C084FC` | Color for git wrapper text such as `git:(` and `)` |
+| `colors.gitBranch` | color value | `#22D3EE` | Color for the git branch and branch status text |
 | `colors.label` | color value | `dim` | Color for labels and secondary metadata such as `Context`, `Usage`, counts, and progress text |
 | `colors.custom` | color value | `208` | Color for the optional custom line |
 | `colors.barFilled` | string | `█` | Character used for the filled portion of progress bars |
 | `colors.barEmpty` | string | `░` | Character used for the empty portion of progress bars |
+| `colors.contextBands` | color band[] | `[]` | Optional context color bands such as `{ "min": 70, "color": "yellow" }`; when present, these override `context` / `warning` / `critical` for context bars |
+| `colors.usageBands` | color band[] | `[]` | Optional usage color bands; when present, these override `usage` / `usageWarning` / `critical` for usage bars |
 
 `colors.barFilled` and `colors.barEmpty` accept a single visible grapheme. Control characters, invisible format characters (bidi controls, zero-width joiners, variation selectors), line/paragraph separators, and noncharacters are rejected. Wide characters (emoji, CJK) may affect bar alignment depending on the terminal.
 
-Supported color names: `dim`, `red`, `green`, `yellow`, `magenta`, `cyan`, `brightBlue`, `brightMagenta`. You can also use a 256-color number (`0-255`) or hex (`#rrggbb`).
+Supported color names: `dim`, `red`, `green`, `yellow`, `magenta`, `cyan`, `brightBlue`, `brightMagenta`. You can also use a 256-color number (`0-255`) or hex (`#rrggbb`). Color bands accept the same color values, filter invalid entries, de-duplicate repeated `min` values, and are sorted from highest `min` to lowest before rendering.
 
 `display.showMemoryUsage` is fully opt-in; add `"memory"` to `rows` to render it. It reports approximate system RAM usage from the local machine, not precise memory pressure inside Claude Code or a specific process. The number may overstate actual pressure because reclaimable OS cache and buffers can still be counted as used memory.
 
@@ -316,9 +313,7 @@ Example fallback snapshot:
     ["model", "contextBar", "contextValue"],
     ["project", "addedDirs", "git"],
     ["sessionTokens"],
-    ["tools"],
-    ["agents"],
-    ["todos"]
+    ["tools", "agents", "todos"]
   ],
   "rowOverflow": "truncate",
   "pathLevels": 2,
@@ -332,20 +327,21 @@ Example fallback snapshot:
     "showTools": true,
     "showAgents": true,
     "showTodos": true,
+    "showUsage": false,
     "showConfigCounts": true,
     "showDuration": true,
     "showMemoryUsage": true
   },
   "colors": {
-    "context": "cyan",
-    "usage": "cyan",
-    "warning": "yellow",
-    "usageWarning": "magenta",
-    "critical": "red",
-    "model": "cyan",
-    "project": "yellow",
-    "git": "magenta",
-    "gitBranch": "cyan",
+    "context": "#22D3EE",
+    "usage": "brightBlue",
+    "warning": "#F59E0B",
+    "usageWarning": "brightMagenta",
+    "critical": "#F43F5E",
+    "model": "#38BDF8",
+    "project": "#FBBF24",
+    "git": "#C084FC",
+    "gitBranch": "#22D3EE",
     "label": "dim",
     "custom": "#FF6600"
   }

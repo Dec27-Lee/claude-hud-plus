@@ -314,17 +314,17 @@ ANTHROPIC_DEFAULT_*_MODEL
 询问：
 
 - header: `功能`
-- question: `是否启用一些可选 HUD 功能？默认显示模型、上下文、项目/Git 和会话 Token 三行核心信息。`
+- question: `是否调整初始化 HUD 配置？默认显示模型、上下文、项目/Git、会话 Token 和工具/Agent/待办四行信息，并默认隐藏使用率。`
 - multiSelect: true
 - options:
-  - `工具活动` — 显示 Read/Edit/Grep 等工具运行状态
-  - `Agent 状态` — 显示运行中的子代理
-  - `待办进度` — 显示 TodoWrite 进度
+  - `隐藏活动行` — 关闭工具、Agent 和待办显示，并移除活动行
+  - `显示使用率` — 显示 Claude 订阅用户的使用率限制（可用时）
   - `中文标签` — 将 HUD 标签语言设置为中文
+  - `保持默认` — 使用四行默认布局和默认 Plus 色盘
 
-如果用户选择了任何选项，写入 `~/.claude/plugins/claude-hud-plus/config.json`。
+如果用户选择了任何会改变配置的选项，写入 `~/.claude/plugins/claude-hud-plus/config.json`。
 
-配置示例，保留当前默认三行布局，只开启用户选择的可选项：
+配置示例，保留当前默认四行布局和默认 Plus 色盘，只应用用户选择的选项：
 
 ```json
 {
@@ -332,13 +332,27 @@ ANTHROPIC_DEFAULT_*_MODEL
   "rows": [
     ["model", "contextBar", "contextValue"],
     ["project", "addedDirs", "git"],
-    ["sessionTokens"]
+    ["sessionTokens"],
+    ["tools", "agents", "todos"]
   ],
   "rowOverflow": "truncate",
   "display": {
     "showTools": true,
     "showAgents": true,
-    "showTodos": true
+    "showTodos": true,
+    "showUsage": false
+  },
+  "colors": {
+    "context": "#22D3EE",
+    "warning": "#F59E0B",
+    "critical": "#F43F5E",
+    "model": "#38BDF8",
+    "project": "#FBBF24",
+    "git": "#C084FC",
+    "gitBranch": "#22D3EE",
+    "label": "dim",
+    "barFilled": "█",
+    "barEmpty": "░"
   }
 }
 ```

@@ -17,9 +17,10 @@
 
 ### 已新增
 
-- 新增 `rows` / `rowOverflow` 行布局配置，默认渲染模型+上下文、项目/额外工作目录+Git、会话 Token 三行 HUD。
-- Plus 路由模型读取：自动对比 Claude Code 当前请求地址与 CCR 配置 `HOST` / `PORT`，确认匹配后读取当前会话级 `ccr-model.json`；状态文件缺失时模型组件显示运行 setup 的中英文提示。
+- 新增 `rows` / `rowOverflow` 行布局配置，默认渲染模型+上下文、项目/额外工作目录+Git、会话 Token、工具/Agent/待办四行 HUD，并采用 Plus 默认色盘。
+- Plus 路由模型读取：自动对比 Claude Code 当前请求地址与 CCR 配置 `HOST` / `PORT`，确认匹配后读取当前会话级 `ccr-model.json`；首轮请求前显示 `Routing...` 占位，已有 Token 活动后仍缺状态文件时显示 setup 提示。
 - Plus 上下文窗口覆盖：支持通过 `CLAUDE_HUD_CONTEXT_WINDOW_SIZE` 覆盖展示用上下文窗口大小并重算百分比。
+- 兼容 `colors.contextBands` / `colors.usageBands` 色带配置，可按百分比分段控制上下文和使用率进度条颜色。
 - `scripts/patch-ccr-session-model.cjs`，用于在 setup 用户确认后备份并修补 CCR，使其写入会话级真实模型状态。
 - `src/plus/` 模块边界，用于放置 Plus 专属增强能力。
 

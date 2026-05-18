@@ -22,6 +22,7 @@ export const en: Messages = {
   "status.limitShort": "Limit",
   "status.allTodosComplete": "All todos complete",
   "status.expired": "expired",
+  "status.ccrModelRouting": "Routing...",
   "status.ccrModelHookMissing": "CCR model hook missing: run /claude-hud-plus:setup",
 
   // Format

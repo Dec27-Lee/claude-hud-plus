@@ -135,14 +135,9 @@ async function createCcrHome({ writeSessionState = false } = {}) {
   return { root, transcriptPath };
 }
 
-test('render rows layout outputs the default Plus three-line HUD', () => {
+test('render rows layout outputs the default Plus four-line HUD when activity is present', () => {
   const ctx = baseContext();
   ctx.config = mergeConfig({
-    rows: [
-      ['model', 'contextBar', 'contextValue'],
-      ['project', 'git'],
-      ['sessionTokens'],
-    ],
     rowOverflow: 'truncate',
     display: {
       modelOverride: 'gpt-5.5',
@@ -167,6 +162,13 @@ test('render rows layout outputs the default Plus three-line HUD', () => {
     cacheCreationTokens: 133400000,
     cacheReadTokens: 0,
   };
+  ctx.transcript.tools = [{
+    id: 'tool-1',
+    name: 'Read',
+    target: 'auth.ts',
+    status: 'running',
+    startTime: new Date(),
+  }];
 
   const lines = withTerminal(120, () => captureRenderLines(ctx));
 
@@ -174,10 +176,11 @@ test('render rows layout outputs the default Plus three-line HUD', () => {
     '[gpt-5.5] ████████░░ 82% (222k/270k)',
     'claude-hud-plus git:(main*)',
     'Tokens 145.2M (in: 11.4M, out: 378k, cache: 133.4M)',
+    '◐ Read: auth.ts',
   ]);
 });
 
-test('render model item shows localized setup hint when CCR session state is missing', async () => {
+test('render model item shows routing placeholder before first CCR request', async () => {
   const env = snapshotRouterEnv();
   const { root, transcriptPath } = await createCcrHome();
 
@@ -190,6 +193,32 @@ test('render model item shows localized setup hint when CCR session state is mis
     const ctx = baseContext();
     ctx.config = mergeConfig({ language: 'zh', rows: [['model']], rowOverflow: 'truncate' });
     ctx.stdin.transcript_path = transcriptPath;
+    ctx.stdin.context_window = { current_usage: { input_tokens: 0 } };
+
+    assert.deepEqual(captureRenderLines(ctx), [
+      '[Routing...]',
+    ]);
+  } finally {
+    setLanguage('en');
+    restoreRouterEnv(env);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('render model item shows localized setup hint after CCR activity without session state', async () => {
+  const env = snapshotRouterEnv();
+  const { root, transcriptPath } = await createCcrHome();
+
+  try {
+    process.env.HOME = root;
+    process.env.USERPROFILE = root;
+    process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456';
+    setLanguage('zh');
+
+    const ctx = baseContext();
+    ctx.config = mergeConfig({ language: 'zh', rows: [['model']], rowOverflow: 'truncate' });
+    ctx.stdin.transcript_path = transcriptPath;
+    ctx.stdin.context_window = { current_usage: { input_tokens: 42 } };
 
     assert.deepEqual(captureRenderLines(ctx), [
       '[CCR真实模型未启用：运行 /claude-hud-plus:setup]',
@@ -252,7 +281,7 @@ test('render rows layout can wrap separator-delimited row content when configure
   ctx.config = mergeConfig({
     rows: [['usage']],
     rowOverflow: 'wrap',
-    display: { usageBarEnabled: false, sevenDayThreshold: 0 },
+    display: { showUsage: true, usageBarEnabled: false, sevenDayThreshold: 0 },
   });
   ctx.usageData = {
     planName: 'Pro',
@@ -430,6 +459,35 @@ test('getContextColor and getQuotaColor respect custom semantic overrides', () =
   assert.equal(getContextColor(70, colors), '\x1b[94m');
   assert.equal(getQuotaColor(25, colors), '\x1b[35m');
   assert.equal(getQuotaColor(80, colors), '\x1b[33m');
+});
+
+test('getContextColor and getQuotaColor prefer color bands when configured', () => {
+  const colors = {
+    context: 'green',
+    usage: 'brightBlue',
+    warning: 'yellow',
+    usageWarning: 'brightMagenta',
+    critical: 'red',
+    contextBands: [
+      { min: 85, color: '#ff0000' },
+      { min: 35, color: 'green' },
+      { min: 0, color: 'cyan' },
+    ],
+    usageBands: [
+      { min: 95, color: 'red' },
+      { min: 85, color: 'magenta' },
+      { min: 70, color: 'yellow' },
+      { min: 0, color: 'cyan' },
+    ],
+  };
+
+  assert.equal(getContextColor(10, colors), '\x1b[36m');
+  assert.equal(getContextColor(35, colors), '\x1b[32m');
+  assert.equal(getContextColor(90, colors), '\x1b[38;2;255;0;0m');
+  assert.equal(getQuotaColor(40, colors), '\x1b[36m');
+  assert.equal(getQuotaColor(75, colors), '\x1b[33m');
+  assert.equal(getQuotaColor(90, colors), '\x1b[35m');
+  assert.equal(getQuotaColor(98, colors), '\x1b[31m');
 });
 
 test('getContextColor and getQuotaColor resolve 256-color indices', () => {

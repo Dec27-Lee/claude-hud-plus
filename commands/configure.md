@@ -12,7 +12,7 @@ allowed-tools: Read, Write, AskUserQuestion
 - 不存在：走“新用户配置流程”。
 - 已存在：走“更新现有配置流程”。
 
-高级设置例如 `colors.*`、`pathLevels`、`display.timeFormat`、`display.usageThreshold`、`display.usageValue`、`display.environmentThreshold`、`display.contextWarningThreshold`、`display.contextCriticalThreshold` 等，保存时必须保留，不要在引导流程里覆盖。
+高级设置例如 `colors.*`、`colors.contextBands`、`colors.usageBands`、`pathLevels`、`display.timeFormat`、`display.usageThreshold`、`display.usageValue`、`display.environmentThreshold`、`display.contextWarningThreshold`、`display.contextCriticalThreshold` 等，保存时必须保留，不要在引导流程里覆盖。
 
 ---
 
@@ -42,13 +42,33 @@ allowed-tools: Read, Write, AskUserQuestion
 - question: `请选择 HUD 行布局：`
 - multiSelect: false
 - options:
-  - `三行默认（推荐）` — 模型+上下文、项目+Git、会话 Token 三行显示
+  - `四行默认（推荐）` — 模型+上下文、项目+Git、会话 Token、工具/Agent/待办四行显示
+  - `三行核心` — 只显示模型+上下文、项目+Git、会话 Token 三行
   - `单行核心` — 把模型、上下文、项目和 Git 放在一行
-  - `活动增强` — 默认三行后追加工具、Agent 和待办活动行
 
 保存规则：
 
-- 三行默认：
+- 四行默认：
+
+```json
+{
+  "rows": [
+    ["model", "contextBar", "contextValue"],
+    ["project", "addedDirs", "git"],
+    ["sessionTokens"],
+    ["tools", "agents", "todos"]
+  ],
+  "rowOverflow": "truncate",
+  "display": {
+    "showTools": true,
+    "showAgents": true,
+    "showTodos": true,
+    "showUsage": false
+  }
+}
+```
+
+- 三行核心：
 
 ```json
 {
@@ -57,7 +77,12 @@ allowed-tools: Read, Write, AskUserQuestion
     ["project", "addedDirs", "git"],
     ["sessionTokens"]
   ],
-  "rowOverflow": "truncate"
+  "rowOverflow": "truncate",
+  "display": {
+    "showTools": false,
+    "showAgents": false,
+    "showTodos": false
+  }
 }
 ```
 
@@ -69,8 +94,6 @@ allowed-tools: Read, Write, AskUserQuestion
   "rowOverflow": "truncate"
 }
 ```
-
-- 活动增强：在三行默认后追加 `["tools"]`、`["agents"]`、`["todos"]`，并开启对应 `display.show*` 开关。
 
 ### Q2：预设
 
@@ -198,9 +221,9 @@ allowed-tools: Read, Write, AskUserQuestion
 - multiSelect: false
 - options:
   - `保持当前` — 不改 `rows` / `rowOverflow`
-  - `三行默认` — 写入默认三行 `rows`，`rowOverflow: "truncate"`
+  - `四行默认` — 写入默认四行 `rows`，`rowOverflow: "truncate"`，开启工具/Agent/待办并关闭使用率
   - `单行核心` — 写入单行核心 `rows`，`rowOverflow: "truncate"`
-  - `重置为完整` — 写入三行默认布局并开启常用显示项
+  - `重置为完整` — 写入四行默认布局并开启常用显示项
 
 ### Q5：语言
 

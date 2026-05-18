@@ -277,7 +277,7 @@ test("main includes usageData from stdin when available", async () => {
     }),
     parseTranscript: async () => makeTranscript(),
     countConfigs: async () => makeCounts(),
-    loadConfig: async () => makeConfig(),
+    loadConfig: async () => makeConfig({ display: { showUsage: true } }),
     getGitStatus: async () => null,
     getUsageFromExternalSnapshot: () => {
       externalCalls += 1;
@@ -305,7 +305,7 @@ test("main leaves usageData null when stdin rate limits are absent and external 
     readStdin: async () => makeStdin({ rate_limits: null }),
     parseTranscript: async () => makeTranscript(),
     countConfigs: async () => makeCounts(),
-    loadConfig: async () => makeConfig(),
+    loadConfig: async () => makeConfig({ display: { showUsage: true } }),
     getGitStatus: async () => null,
     getUsageFromExternalSnapshot: () => {
       externalCalls += 1;
@@ -334,7 +334,7 @@ test("main uses external usage fallback when stdin rate limits are absent", asyn
     readStdin: async () => makeStdin({ rate_limits: null }),
     parseTranscript: async () => makeTranscript(),
     countConfigs: async () => makeCounts(),
-    loadConfig: async () => makeConfig(),
+    loadConfig: async () => makeConfig({ display: { showUsage: true } }),
     getGitStatus: async () => null,
     now: () => Date.UTC(2026, 3, 20, 12, 1, 0),
     getUsageFromExternalSnapshot: (config, now) => {
@@ -365,7 +365,7 @@ test("main prefers stdin usage over external usage fallback", async () => {
     }),
     parseTranscript: async () => makeTranscript(),
     countConfigs: async () => makeCounts(),
-    loadConfig: async () => makeConfig(),
+    loadConfig: async () => makeConfig({ display: { showUsage: true } }),
     getGitStatus: async () => null,
     getUsageFromExternalSnapshot: () => {
       externalCalls += 1;

@@ -92,7 +92,21 @@ export function warning(text, colors) {
 export function critical(text, colors) {
     return colorize(text, resolveAnsi(colors?.critical, RED));
 }
+function getBandColor(percent, bands) {
+    if (!bands?.length) {
+        return null;
+    }
+    for (const band of bands) {
+        if (percent >= band.min) {
+            return band.color;
+        }
+    }
+    return null;
+}
 export function getContextColor(percent, colors, thresholds) {
+    const bandColor = getBandColor(percent, colors?.contextBands);
+    if (bandColor !== null)
+        return resolveAnsi(bandColor, GREEN);
     const critical = thresholds?.critical ?? 85;
     const warning = thresholds?.warning ?? 70;
     if (percent >= critical)
@@ -102,6 +116,9 @@ export function getContextColor(percent, colors, thresholds) {
     return resolveAnsi(colors?.context, GREEN);
 }
 export function getQuotaColor(percent, colors) {
+    const bandColor = getBandColor(percent, colors?.usageBands);
+    if (bandColor !== null)
+        return resolveAnsi(bandColor, BRIGHT_BLUE);
     if (percent >= 90)
         return resolveAnsi(colors?.critical, RED);
     if (percent >= 75)

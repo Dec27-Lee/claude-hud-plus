@@ -107,7 +107,7 @@ test('router model resolver ignores stale session state', () => {
   }
 });
 
-test('router model status reports missing session state when using CCR without a state file', () => {
+test('router model status reports pending session state before the first routed request', () => {
   const env = snapshotEnv();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-hud-router-'));
   const sessionId = '66666666-6666-4666-8666-666666666666';
@@ -119,8 +119,34 @@ test('router model status reports missing session state when using CCR without a
     fs.writeFileSync(transcriptPath, '{}\n');
     process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456';
 
-    assert.deepEqual(getRouterModelStatus({ transcript_path: transcriptPath }), { kind: 'missing-session-state' });
+    assert.deepEqual(getRouterModelStatus({ transcript_path: transcriptPath }), { kind: 'pending-session-state' });
     assert.equal(getRouterModelInfo({ transcript_path: transcriptPath }), null);
+  } finally {
+    restoreEnv(env);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('router model status reports missing session state after routed token activity', () => {
+  const env = snapshotEnv();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-hud-router-'));
+  const sessionId = '77777777-7777-4777-8777-777777777777';
+  const transcriptPath = path.join(root, `${sessionId}.jsonl`);
+
+  try {
+    useHome(root);
+    writeCcrConfig(root, { host: '127.0.0.1', port: 3456 });
+    fs.writeFileSync(transcriptPath, '{}\n');
+    process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456';
+
+    assert.deepEqual(getRouterModelStatus({
+      transcript_path: transcriptPath,
+      context_window: { current_usage: { input_tokens: 42 } },
+    }), { kind: 'missing-session-state' });
+    assert.equal(getRouterModelInfo({
+      transcript_path: transcriptPath,
+      context_window: { current_usage: { input_tokens: 42 } },
+    }), null);
   } finally {
     restoreEnv(env);
     fs.rmSync(root, { recursive: true, force: true });

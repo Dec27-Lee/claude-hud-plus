@@ -18,9 +18,12 @@ export function getRouterModelStatus(stdin) {
     const sessionId = getSessionIdFromTranscriptPath(transcriptPath);
     if (sessionId && typeof transcriptPath === 'string' && transcriptPath.trim()) {
         const info = readRouterModelState(getClaudeSessionModelPath(transcriptPath, sessionId), now, 'session');
-        return info ? { kind: 'ready', info } : { kind: 'missing-session-state' };
+        if (info) {
+            return { kind: 'ready', info };
+        }
+        return hasModelRequestEvidence(stdin) ? { kind: 'missing-session-state' } : { kind: 'pending-session-state' };
     }
-    return { kind: 'missing-session-state' };
+    return hasModelRequestEvidence(stdin) ? { kind: 'missing-session-state' } : { kind: 'pending-session-state' };
 }
 function readRouterModelState(statePath, now, source) {
     if (routerModelCache && routerModelCache.statePath === statePath && routerModelCache.expiresAt > now) {
@@ -114,6 +117,16 @@ function getSessionIdFromTranscriptPath(transcriptPath) {
 }
 function getClaudeSessionModelPath(transcriptPath, sessionId) {
     return path.join(path.dirname(transcriptPath), sessionId, 'ccr-model.json');
+}
+function hasModelRequestEvidence(stdin) {
+    const usage = stdin.context_window?.current_usage;
+    const currentTokens = (usage?.input_tokens ?? 0) +
+        (usage?.output_tokens ?? 0) +
+        (usage?.cache_creation_input_tokens ?? 0) +
+        (usage?.cache_read_input_tokens ?? 0);
+    const totalTokens = (stdin.context_window?.total_input_tokens ?? 0) +
+        (stdin.context_window?.total_output_tokens ?? 0);
+    return currentTokens > 0 || totalTokens > 0;
 }
 function isCurrentClaudeCodeUsingCcr() {
     const baseUrl = readString(process.env.ANTHROPIC_BASE_URL) ?? readString(process.env.ANTHROPIC_API_BASE_URL);

@@ -54,12 +54,14 @@ export function renderSessionLine(ctx: RenderContext): string {
   // Model and context bar (FIRST)
   const providerLabel = routerStatus.kind === 'ready' ? null : getProviderLabel(ctx.stdin);
   const modelQualifier = providerLabel ?? undefined;
-  let modelDisplay = routerStatus.kind === 'missing-session-state'
-    ? t('status.ccrModelHookMissing')
-    : (modelQualifier ? `${model} | ${modelQualifier}` : model);
-  if (routerStatus.kind !== 'missing-session-state' && ctx.effortLevel && ctx.effortSymbol) {
+  let modelDisplay = routerStatus.kind === 'pending-session-state'
+    ? t('status.ccrModelRouting')
+    : routerStatus.kind === 'missing-session-state'
+      ? t('status.ccrModelHookMissing')
+      : (modelQualifier ? `${model} | ${modelQualifier}` : model);
+  if (routerStatus.kind !== 'pending-session-state' && routerStatus.kind !== 'missing-session-state' && ctx.effortLevel && ctx.effortSymbol) {
     modelDisplay += ` ${ctx.effortSymbol} ${ctx.effortLevel}`;
-  } else if (routerStatus.kind !== 'missing-session-state' && ctx.effortLevel) {
+  } else if (routerStatus.kind !== 'pending-session-state' && routerStatus.kind !== 'missing-session-state' && ctx.effortLevel) {
     modelDisplay += ` ${ctx.effortLevel}`;
   }
   const modelPart = routerStatus.kind === 'missing-session-state'

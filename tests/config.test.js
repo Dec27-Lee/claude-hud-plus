@@ -28,7 +28,7 @@ test('loadConfig returns valid config structure', async () => {
   // pathLevels must be 1, 2, or 3
   assert.ok([1, 2, 3].includes(config.pathLevels), 'pathLevels should be 1, 2, or 3');
 
-  assert.deepEqual(config.rows, DEFAULT_ROWS, 'rows should default to the Plus three-line layout');
+  assert.deepEqual(config.rows, DEFAULT_ROWS, 'rows should default to the Plus four-line layout');
   assert.equal(config.rowOverflow, 'truncate', 'rowOverflow should default to truncate');
 
   // showSeparators must be boolean
@@ -457,7 +457,7 @@ test('mergeConfig falls back to default for invalid usageValue', () => {
   assert.equal(config.display.usageValue, DEFAULT_CONFIG.display.usageValue);
 });
 
-test('mergeConfig defaults rows to the Plus three-line layout', () => {
+test('mergeConfig defaults rows to the Plus four-line layout', () => {
   const config = mergeConfig({});
   assert.deepEqual(config.rows, DEFAULT_ROWS);
 });
@@ -569,17 +569,53 @@ test('mergeConfig falls back to default when elementOrder is empty or invalid', 
 
 test('mergeConfig defaults colors to expected semantic palette', () => {
   const config = mergeConfig({});
-  assert.equal(config.colors.context, 'green');
+  assert.equal(config.colors.context, '#22D3EE');
   assert.equal(config.colors.usage, 'brightBlue');
-  assert.equal(config.colors.warning, 'yellow');
+  assert.equal(config.colors.warning, '#F59E0B');
   assert.equal(config.colors.usageWarning, 'brightMagenta');
-  assert.equal(config.colors.critical, 'red');
-  assert.equal(config.colors.model, 'cyan');
-  assert.equal(config.colors.project, 'yellow');
-  assert.equal(config.colors.git, 'magenta');
-  assert.equal(config.colors.gitBranch, 'cyan');
+  assert.equal(config.colors.critical, '#F43F5E');
+  assert.equal(config.colors.model, '#38BDF8');
+  assert.equal(config.colors.project, '#FBBF24');
+  assert.equal(config.colors.git, '#C084FC');
+  assert.equal(config.colors.gitBranch, '#22D3EE');
   assert.equal(config.colors.label, 'dim');
   assert.equal(config.colors.custom, 208);
+  assert.deepEqual(config.colors.contextBands, []);
+  assert.deepEqual(config.colors.usageBands, []);
+});
+
+test('mergeConfig accepts and sorts color bands while filtering invalid entries', () => {
+  const config = mergeConfig({
+    colors: {
+      contextBands: [
+        { min: 0, color: 'cyan' },
+        { min: 85, color: '#ff0000' },
+        { min: 70, color: 220 },
+        { min: 70, color: 'green' },
+        { min: -1, color: 'red' },
+        { min: 101, color: 'red' },
+        { min: 35, color: 'not-a-color' },
+        { min: 95 },
+        null,
+      ],
+      usageBands: [
+        { min: 70, color: 'yellow' },
+        { min: 95, color: 'red' },
+        { min: 0, color: 'cyan' },
+      ],
+    },
+  });
+
+  assert.deepEqual(config.colors.contextBands, [
+    { min: 85, color: '#ff0000' },
+    { min: 70, color: 220 },
+    { min: 0, color: 'cyan' },
+  ]);
+  assert.deepEqual(config.colors.usageBands, [
+    { min: 95, color: 'red' },
+    { min: 70, color: 'yellow' },
+    { min: 0, color: 'cyan' },
+  ]);
 });
 
 test('mergeConfig accepts valid color overrides and filters invalid values', () => {

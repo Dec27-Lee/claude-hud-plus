@@ -11,6 +11,8 @@ export type RouterModelStatus = {
     kind: 'ready';
     info: RouterModelInfo;
 } | {
+    kind: 'pending-session-state';
+} | {
     kind: 'missing-session-state';
 };
 export declare function getRouterModelInfo(stdin: StdinData): RouterModelInfo | null;

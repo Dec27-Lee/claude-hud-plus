@@ -4,9 +4,8 @@ research/
 # 依赖
 node_modules/
 
-# 构建产物
-# dist/ 由 npm run build 生成，不是源码事实。
-dist/
+# 构建缓存
+# dist/ 是随包发布的构建产物，需要提交；不要忽略。
 *.tsbuildinfo
 
 # 日志

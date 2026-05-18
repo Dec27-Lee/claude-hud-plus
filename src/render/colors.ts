@@ -1,4 +1,4 @@
-import type { HudColorName, HudColorValue, HudColorOverrides } from '../config.js';
+import type { HudColorName, HudColorValue, HudColorOverrides, HudColorBand } from '../config.js';
 
 export const RESET = '\x1b[0m';
 
@@ -121,11 +121,28 @@ export interface ContextThresholds {
   critical?: number;
 }
 
+function getBandColor(percent: number, bands: HudColorBand[] | undefined): HudColorValue | null {
+  if (!bands?.length) {
+    return null;
+  }
+
+  for (const band of bands) {
+    if (percent >= band.min) {
+      return band.color;
+    }
+  }
+
+  return null;
+}
+
 export function getContextColor(
   percent: number,
   colors?: Partial<HudColorOverrides>,
   thresholds?: ContextThresholds,
 ): string {
+  const bandColor = getBandColor(percent, colors?.contextBands);
+  if (bandColor !== null) return resolveAnsi(bandColor, GREEN);
+
   const critical = thresholds?.critical ?? 85;
   const warning = thresholds?.warning ?? 70;
   if (percent >= critical) return resolveAnsi(colors?.critical, RED);
@@ -134,6 +151,9 @@ export function getContextColor(
 }
 
 export function getQuotaColor(percent: number, colors?: Partial<HudColorOverrides>): string {
+  const bandColor = getBandColor(percent, colors?.usageBands);
+  if (bandColor !== null) return resolveAnsi(bandColor, BRIGHT_BLUE);
+
   if (percent >= 90) return resolveAnsi(colors?.critical, RED);
   if (percent >= 75) return resolveAnsi(colors?.usageWarning, BRIGHT_MAGENTA);
   return resolveAnsi(colors?.usage, BRIGHT_BLUE);

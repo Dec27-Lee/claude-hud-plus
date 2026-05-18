@@ -22,6 +22,7 @@ export const DEFAULT_ROWS = [
     ['model', 'contextBar', 'contextValue'],
     ['project', 'addedDirs', 'git'],
     ['sessionTokens'],
+    ['tools', 'agents', 'todos'],
 ];
 const KNOWN_ELEMENTS = new Set(DEFAULT_ELEMENT_ORDER);
 const KNOWN_ROW_ITEMS = new Set([
@@ -72,14 +73,14 @@ export const DEFAULT_CONFIG = {
         showDuration: false,
         showSpeed: false,
         showTokenBreakdown: true,
-        showUsage: true,
+        showUsage: false,
         usageValue: 'percent',
         usageBarEnabled: true,
         showResetLabel: true,
         usageCompact: false,
-        showTools: false,
-        showAgents: false,
-        showTodos: false,
+        showTools: true,
+        showAgents: true,
+        showTodos: true,
         showSessionName: false,
         showClaudeCodeVersion: false,
         showEffortLevel: false,
@@ -105,19 +106,21 @@ export const DEFAULT_CONFIG = {
         timeFormat: 'relative',
     },
     colors: {
-        context: 'green',
+        context: '#22D3EE',
         usage: 'brightBlue',
-        warning: 'yellow',
+        warning: '#F59E0B',
         usageWarning: 'brightMagenta',
-        critical: 'red',
-        model: 'cyan',
-        project: 'yellow',
-        git: 'magenta',
-        gitBranch: 'cyan',
+        critical: '#F43F5E',
+        model: '#38BDF8',
+        project: '#FBBF24',
+        git: '#C084FC',
+        gitBranch: '#22D3EE',
         label: 'dim',
         custom: 208,
         barFilled: '█',
         barEmpty: '░',
+        contextBands: [],
+        usageBands: [],
     },
 };
 export function getConfigPath() {
@@ -180,6 +183,29 @@ function validateColorValue(value) {
     if (typeof value === 'string' && HEX_COLOR_PATTERN.test(value))
         return true;
     return false;
+}
+function validateColorBands(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    const seen = new Set();
+    const bands = [];
+    for (const entry of value) {
+        if (!entry || typeof entry !== 'object') {
+            continue;
+        }
+        const raw = entry;
+        const min = raw.min;
+        if (typeof min !== 'number' || !Number.isFinite(min) || min < 0 || min > 100 || seen.has(min)) {
+            continue;
+        }
+        if (!validateColorValue(raw.color)) {
+            continue;
+        }
+        seen.add(min);
+        bands.push({ min, color: raw.color });
+    }
+    return bands.sort((a, b) => b.min - a.min);
 }
 function validateElementOrder(value) {
     if (!Array.isArray(value) || value.length === 0) {
@@ -508,6 +534,8 @@ export function mergeConfig(userConfig) {
         barEmpty: validateBarChar(migrated.colors?.barEmpty)
             ? migrated.colors.barEmpty
             : DEFAULT_CONFIG.colors.barEmpty,
+        contextBands: validateColorBands(migrated.colors?.contextBands),
+        usageBands: validateColorBands(migrated.colors?.usageBands),
     };
     return { language, rows, rowOverflow, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, gitStatus, display, colors };
 }

@@ -20,6 +20,10 @@ export type AddedDirsLayout = 'inline' | 'line';
 export type HudColorName = 'dim' | 'red' | 'green' | 'yellow' | 'magenta' | 'cyan' | 'brightBlue' | 'brightMagenta';
 /** A color value: named preset, 256-color index (0-255), or hex string (#rrggbb). */
 export type HudColorValue = HudColorName | number | string;
+export interface HudColorBand {
+    min: number;
+    color: HudColorValue;
+}
 export interface HudColorOverrides {
     context: HudColorValue;
     usage: HudColorValue;
@@ -34,6 +38,8 @@ export interface HudColorOverrides {
     custom: HudColorValue;
     barFilled: string;
     barEmpty: string;
+    contextBands: HudColorBand[];
+    usageBands: HudColorBand[];
 }
 export declare const DEFAULT_ELEMENT_ORDER: HudElement[];
 export declare const DEFAULT_MERGE_GROUPS: HudElement[][];

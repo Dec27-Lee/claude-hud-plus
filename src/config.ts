@@ -37,6 +37,11 @@ export type HudColorName =
 /** A color value: named preset, 256-color index (0-255), or hex string (#rrggbb). */
 export type HudColorValue = HudColorName | number | string;
 
+export interface HudColorBand {
+  min: number;
+  color: HudColorValue;
+}
+
 export interface HudColorOverrides {
   context: HudColorValue;
   usage: HudColorValue;
@@ -51,6 +56,8 @@ export interface HudColorOverrides {
   custom: HudColorValue;
   barFilled: string;
   barEmpty: string;
+  contextBands: HudColorBand[];
+  usageBands: HudColorBand[];
 }
 
 export const DEFAULT_ELEMENT_ORDER: HudElement[] = [
@@ -75,6 +82,7 @@ export const DEFAULT_ROWS: HudRow[] = [
   ['model', 'contextBar', 'contextValue'],
   ['project', 'addedDirs', 'git'],
   ['sessionTokens'],
+  ['tools', 'agents', 'todos'],
 ];
 
 const KNOWN_ELEMENTS = new Set<HudElement>(DEFAULT_ELEMENT_ORDER);
@@ -192,14 +200,14 @@ export const DEFAULT_CONFIG: HudConfig = {
     showDuration: false,
     showSpeed: false,
     showTokenBreakdown: true,
-    showUsage: true,
+    showUsage: false,
     usageValue: 'percent',
     usageBarEnabled: true,
     showResetLabel: true,
     usageCompact: false,
-    showTools: false,
-    showAgents: false,
-    showTodos: false,
+    showTools: true,
+    showAgents: true,
+    showTodos: true,
     showSessionName: false,
     showClaudeCodeVersion: false,
     showEffortLevel: false,
@@ -225,19 +233,21 @@ export const DEFAULT_CONFIG: HudConfig = {
     timeFormat: 'relative',
   },
   colors: {
-    context: 'green',
+    context: '#22D3EE',
     usage: 'brightBlue',
-    warning: 'yellow',
+    warning: '#F59E0B',
     usageWarning: 'brightMagenta',
-    critical: 'red',
-    model: 'cyan',
-    project: 'yellow',
-    git: 'magenta',
-    gitBranch: 'cyan',
+    critical: '#F43F5E',
+    model: '#38BDF8',
+    project: '#FBBF24',
+    git: '#C084FC',
+    gitBranch: '#22D3EE',
     label: 'dim',
     custom: 208,
     barFilled: '█',
     barEmpty: '░',
+    contextBands: [],
+    usageBands: [],
   },
 };
 
@@ -310,6 +320,34 @@ function validateColorValue(value: unknown): value is HudColorValue {
   if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 255) return true;
   if (typeof value === 'string' && HEX_COLOR_PATTERN.test(value)) return true;
   return false;
+}
+
+function validateColorBands(value: unknown): HudColorBand[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<number>();
+  const bands: HudColorBand[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+
+    const raw = entry as Record<string, unknown>;
+    const min = raw.min;
+    if (typeof min !== 'number' || !Number.isFinite(min) || min < 0 || min > 100 || seen.has(min)) {
+      continue;
+    }
+    if (!validateColorValue(raw.color)) {
+      continue;
+    }
+
+    seen.add(min);
+    bands.push({ min, color: raw.color });
+  }
+
+  return bands.sort((a, b) => b.min - a.min);
 }
 
 function validateElementOrder(value: unknown): HudElement[] {
@@ -690,6 +728,8 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
     barEmpty: validateBarChar(migrated.colors?.barEmpty)
       ? migrated.colors.barEmpty
       : DEFAULT_CONFIG.colors.barEmpty,
+    contextBands: validateColorBands(migrated.colors?.contextBands),
+    usageBands: validateColorBands(migrated.colors?.usageBands),
   };
 
   return { language, rows, rowOverflow, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, gitStatus, display, colors };

@@ -59,6 +59,9 @@ export function renderModelPart(ctx: RenderContext): string | null {
 
   const colors = ctx.config?.colors;
   const routerStatus = getRouterModelStatus(ctx.stdin);
+  if (routerStatus.kind === 'pending-session-state') {
+    return modelColor(`[${t('status.ccrModelRouting')}]`, colors);
+  }
   if (routerStatus.kind === 'missing-session-state') {
     return warningColor(`[${t('status.ccrModelHookMissing')}]`, colors);
   }
