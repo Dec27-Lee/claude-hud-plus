@@ -52,10 +52,10 @@ export function getRouterModelStatus(stdin: StdinData): RouterModelStatus {
     if (info) {
       return { kind: 'ready', info };
     }
-    return hasModelRequestEvidence(stdin) ? { kind: 'missing-session-state' } : { kind: 'pending-session-state' };
+    return shouldWarnForMissingSessionState(stdin, transcriptPath) ? { kind: 'missing-session-state' } : { kind: 'pending-session-state' };
   }
 
-  return hasModelRequestEvidence(stdin) ? { kind: 'missing-session-state' } : { kind: 'pending-session-state' };
+  return shouldWarnForMissingSessionState(stdin, transcriptPath) ? { kind: 'missing-session-state' } : { kind: 'pending-session-state' };
 }
 
 function readRouterModelState(statePath: string, now: number, source: RouterModelInfo['source']): RouterModelInfo | null {
@@ -159,6 +159,17 @@ function getClaudeSessionModelPath(transcriptPath: string, sessionId: string): s
   return path.join(path.dirname(transcriptPath), sessionId, 'ccr-model.json');
 }
 
+function shouldWarnForMissingSessionState(stdin: StdinData, transcriptPath: unknown): boolean {
+  if (!hasModelRequestEvidence(stdin)) {
+    return false;
+  }
+  if (typeof transcriptPath !== 'string' || !transcriptPath.trim()) {
+    return true;
+  }
+
+  return countTranscriptUserTurns(transcriptPath) > 1;
+}
+
 function hasModelRequestEvidence(stdin: StdinData): boolean {
   const usage = stdin.context_window?.current_usage;
   const currentTokens =
@@ -171,6 +182,41 @@ function hasModelRequestEvidence(stdin: StdinData): boolean {
     (stdin.context_window?.total_output_tokens ?? 0);
 
   return currentTokens > 0 || totalTokens > 0;
+}
+
+function countTranscriptUserTurns(transcriptPath: string): number {
+  let fd: number | null = null;
+  let userTurns = 0;
+  try {
+    fd = fs.openSync(transcriptPath, 'r');
+    const buffer = Buffer.alloc(64 * 1024);
+    const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0);
+    const firstChunk = buffer.subarray(0, bytesRead).toString('utf8');
+    for (const line of firstChunk.split(/\r?\n/)) {
+      if (!line.trim()) {
+        continue;
+      }
+      try {
+        const parsed = JSON.parse(line) as { type?: unknown };
+        if (parsed.type === 'user') {
+          userTurns += 1;
+          if (userTurns > 1) {
+            return userTurns;
+          }
+        }
+      } catch {}
+    }
+  } catch {
+    return 0;
+  } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch {}
+    }
+  }
+
+  return userTurns;
 }
 
 function isCurrentClaudeCodeUsingCcr(): boolean {

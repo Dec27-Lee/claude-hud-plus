@@ -127,7 +127,7 @@ test('router model status reports pending session state before the first routed 
   }
 });
 
-test('router model status reports missing session state after routed token activity', () => {
+test('router model status keeps routing during first routed turn without session state', () => {
   const env = snapshotEnv();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-hud-router-'));
   const sessionId = '77777777-7777-4777-8777-777777777777';
@@ -136,7 +136,33 @@ test('router model status reports missing session state after routed token activ
   try {
     useHome(root);
     writeCcrConfig(root, { host: '127.0.0.1', port: 3456 });
-    fs.writeFileSync(transcriptPath, '{}\n');
+    fs.writeFileSync(transcriptPath, `${JSON.stringify({ type: 'user' })}\n${JSON.stringify({ type: 'assistant' })}\n`);
+    process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456';
+
+    assert.deepEqual(getRouterModelStatus({
+      transcript_path: transcriptPath,
+      context_window: { current_usage: { input_tokens: 42 } },
+    }), { kind: 'pending-session-state' });
+    assert.equal(getRouterModelInfo({
+      transcript_path: transcriptPath,
+      context_window: { current_usage: { input_tokens: 42 } },
+    }), null);
+  } finally {
+    restoreEnv(env);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('router model status reports missing session state after multiple routed turns', () => {
+  const env = snapshotEnv();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-hud-router-'));
+  const sessionId = '88888888-8888-4888-8888-888888888888';
+  const transcriptPath = path.join(root, `${sessionId}.jsonl`);
+
+  try {
+    useHome(root);
+    writeCcrConfig(root, { host: '127.0.0.1', port: 3456 });
+    fs.writeFileSync(transcriptPath, `${JSON.stringify({ type: 'user' })}\n${JSON.stringify({ type: 'assistant' })}\n${JSON.stringify({ type: 'user' })}\n`);
     process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456';
 
     assert.deepEqual(getRouterModelStatus({

@@ -120,7 +120,7 @@ function restoreRouterEnv(env) {
   }
 }
 
-async function createCcrHome({ writeSessionState = false } = {}) {
+async function createCcrHome({ writeSessionState = false, userTurns = 0 } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'claude-hud-render-'));
   const sessionId = '77777777-7777-4777-8777-777777777777';
   const transcriptPath = path.join(root, 'project', `${sessionId}.jsonl`);
@@ -128,7 +128,8 @@ async function createCcrHome({ writeSessionState = false } = {}) {
   await mkdir(path.join(root, '.claude-code-router'), { recursive: true });
   await mkdir(sessionDir, { recursive: true });
   await writeFile(path.join(root, '.claude-code-router', 'config.json'), JSON.stringify({ HOST: '127.0.0.1', PORT: 3456 }));
-  await writeFile(transcriptPath, '{}\n');
+  const transcriptLines = Array.from({ length: userTurns }, () => JSON.stringify({ type: 'user' }));
+  await writeFile(transcriptPath, transcriptLines.length ? `${transcriptLines.join('\n')}\n` : '{}\n');
   if (writeSessionState) {
     await writeFile(path.join(sessionDir, 'ccr-model.json'), JSON.stringify({ model: 'gpt-5.5', provider: 'openrouter' }));
   }
@@ -205,9 +206,9 @@ test('render model item shows routing placeholder before first CCR request', asy
   }
 });
 
-test('render model item shows localized setup hint after CCR activity without session state', async () => {
+test('render model item shows localized setup hint after repeated CCR activity without session state', async () => {
   const env = snapshotRouterEnv();
-  const { root, transcriptPath } = await createCcrHome();
+  const { root, transcriptPath } = await createCcrHome({ userTurns: 2 });
 
   try {
     process.env.HOME = root;
