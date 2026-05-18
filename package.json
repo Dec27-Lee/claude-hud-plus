@@ -1,6 +1,6 @@
 {
   "name": "claude-hud-plus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "增强型 Claude Code 状态栏 HUD：显示 API 路由真实模型并支持长会话诊断",
   "type": "module",
   "main": "dist/index.js",

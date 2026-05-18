@@ -1,7 +1,7 @@
 {
   "name": "claude-hud-plus",
   "description": "增强型 Claude Code 状态栏 HUD：显示 API 路由后的真实模型、长会话诊断信息，并提升多终端显示稳定性。",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Dec27-Lee",
     "url": "https://github.com/Dec27-Lee"
