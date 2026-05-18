@@ -465,7 +465,7 @@ test("main skips Claude Code version lookup when disabled", async () => {
   assert.equal(lookupCalls, 0);
 });
 
-test("main includes memoryUsage in render context only for expanded layout when enabled", async () => {
+test("main includes memoryUsage in render context when enabled", async () => {
   let renderedContext;
   let lookupCalls = 0;
   const mockMemoryUsage = {
@@ -480,7 +480,6 @@ test("main includes memoryUsage in render context only for expanded layout when 
     parseTranscript: async () => makeTranscript(),
     countConfigs: async () => makeCounts(),
     loadConfig: async () => makeConfig({
-      lineLayout: "expanded",
       display: { showMemoryUsage: true },
     }),
     getGitStatus: async () => null,
@@ -497,7 +496,7 @@ test("main includes memoryUsage in render context only for expanded layout when 
   assert.deepEqual(renderedContext?.memoryUsage, mockMemoryUsage);
 });
 
-test("main skips memoryUsage lookup for compact layout even when enabled", async () => {
+test("main skips memoryUsage lookup when memory display is disabled", async () => {
   let lookupCalls = 0;
 
   await main({
@@ -505,8 +504,7 @@ test("main skips memoryUsage lookup for compact layout even when enabled", async
     parseTranscript: async () => makeTranscript(),
     countConfigs: async () => makeCounts(),
     loadConfig: async () => makeConfig({
-      lineLayout: "compact",
-      display: { showMemoryUsage: true },
+      display: { showMemoryUsage: false },
     }),
     getGitStatus: async () => null,
     getMemoryUsage: async () => {

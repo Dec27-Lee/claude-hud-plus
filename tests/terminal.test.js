@@ -6,12 +6,15 @@ describe('getAdaptiveBarWidth', () => {
   let originalStdoutColumns;
   let originalStderrColumns;
   let originalEnvColumns;
+  let originalHudTerminalWidth;
 
   beforeEach(() => {
     originalStdoutColumns = Object.getOwnPropertyDescriptor(process.stdout, 'columns');
     originalStderrColumns = Object.getOwnPropertyDescriptor(process.stderr, 'columns');
     originalEnvColumns = process.env.COLUMNS;
+    originalHudTerminalWidth = process.env.CLAUDE_HUD_TERMINAL_WIDTH;
     delete process.env.COLUMNS;
+    delete process.env.CLAUDE_HUD_TERMINAL_WIDTH;
   });
 
   afterEach(() => {
@@ -29,6 +32,11 @@ describe('getAdaptiveBarWidth', () => {
       process.env.COLUMNS = originalEnvColumns;
     } else {
       delete process.env.COLUMNS;
+    }
+    if (originalHudTerminalWidth !== undefined) {
+      process.env.CLAUDE_HUD_TERMINAL_WIDTH = originalHudTerminalWidth;
+    } else {
+      delete process.env.CLAUDE_HUD_TERMINAL_WIDTH;
     }
   });
 
@@ -72,7 +80,20 @@ describe('getAdaptiveBarWidth', () => {
     assert.equal(getAdaptiveBarWidth(), 10);
   });
 
-  test('treats COLUMNS env var as a hard override when present', () => {
+  test('treats dynamic HUD terminal width as a hard override when present', () => {
+    Object.defineProperty(process.stdout, 'columns', { value: 120, configurable: true });
+    process.env.CLAUDE_HUD_TERMINAL_WIDTH = '70';
+    assert.equal(getAdaptiveBarWidth(), 6);
+  });
+
+  test('prefers dynamic HUD terminal width over COLUMNS', () => {
+    Object.defineProperty(process.stdout, 'columns', { value: 120, configurable: true });
+    process.env.CLAUDE_HUD_TERMINAL_WIDTH = '70';
+    process.env.COLUMNS = '120';
+    assert.equal(getAdaptiveBarWidth(), 6);
+  });
+
+  test('keeps COLUMNS as compatibility fallback', () => {
     Object.defineProperty(process.stdout, 'columns', { value: 120, configurable: true });
     process.env.COLUMNS = '70';
     assert.equal(getAdaptiveBarWidth(), 6);

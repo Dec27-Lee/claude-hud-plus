@@ -29,28 +29,48 @@ allowed-tools: Read, Write, AskUserQuestion
 
 当配置文件不存在时，依次询问：
 
-1. 布局
+1. 行布局
 2. 预设
 3. 语言
 4. 要关闭的项目
 5. 要额外开启的项目
 6. 自定义短语
 
-### Q1：布局
+### Q1：行布局
 
-- header: `布局`
-- question: `请选择 HUD 布局：`
+- header: `行布局`
+- question: `请选择 HUD 行布局：`
 - multiSelect: false
 - options:
-  - `展开布局（推荐）` — 分成语义清晰的多行：身份、项目、环境、用量等
-  - `紧凑布局` — 尽量压缩到一行
-  - `紧凑布局 + 分隔线` — 一行显示，并在活动信息前增加分隔线
+  - `三行默认（推荐）` — 模型+上下文、项目+Git、会话 Token 三行显示
+  - `单行核心` — 把模型、上下文、项目和 Git 放在一行
+  - `活动增强` — 默认三行后追加工具、Agent 和待办活动行
 
 保存规则：
 
-- 展开布局：`lineLayout: "expanded"`，`showSeparators: false`
-- 紧凑布局：`lineLayout: "compact"`，`showSeparators: false`
-- 紧凑布局 + 分隔线：`lineLayout: "compact"`，`showSeparators: true`
+- 三行默认：
+
+```json
+{
+  "rows": [
+    ["model", "contextBar", "contextValue"],
+    ["project", "addedDirs", "git"],
+    ["sessionTokens"]
+  ],
+  "rowOverflow": "truncate"
+}
+```
+
+- 单行核心：
+
+```json
+{
+  "rows": [["model", "contextBar", "contextValue", "project", "git"]],
+  "rowOverflow": "truncate"
+}
+```
+
+- 活动增强：在三行默认后追加 `["tools"]`、`["agents"]`、`["todos"]`，并开启对应 `display.show*` 开关。
 
 ### Q2：预设
 
@@ -142,7 +162,7 @@ allowed-tools: Read, Write, AskUserQuestion
 1. 关闭项目
 2. 开启项目
 3. Git 显示方式
-4. 布局/重置
+4. 行布局/重置
 5. 语言
 6. 自定义短语
 
@@ -171,16 +191,16 @@ allowed-tools: Read, Write, AskUserQuestion
   - `详细状态` — 显示分支、dirty、ahead/behind、文件统计
   - `隐藏 Git` — 设置 `gitStatus.enabled: false`
 
-### Q4：布局/重置
+### Q4：行布局/重置
 
-- header: `布局`
-- question: `是否调整布局或重置为完整配置？`
+- header: `行布局`
+- question: `是否调整行布局或重置为完整配置？`
 - multiSelect: false
 - options:
-  - `保持当前` — 不改布局
-  - `展开布局` — 设置 `lineLayout: "expanded"`
-  - `紧凑布局` — 设置 `lineLayout: "compact"`
-  - `重置为完整` — 开启常用显示项
+  - `保持当前` — 不改 `rows` / `rowOverflow`
+  - `三行默认` — 写入默认三行 `rows`，`rowOverflow: "truncate"`
+  - `单行核心` — 写入单行核心 `rows`，`rowOverflow: "truncate"`
+  - `重置为完整` — 写入三行默认布局并开启常用显示项
 
 ### Q5：语言
 
@@ -209,7 +229,7 @@ allowed-tools: Read, Write, AskUserQuestion
 保存前必须：
 
 1. 保留用户已有的未知字段和高级手动配置。
-2. 只修改本次向导涉及的字段。
+2. 只修改本次向导涉及的字段。不要写入 `lineLayout`；布局只通过 `rows` 和 `rowOverflow` 表达。
 3. 保持 JSON 缩进为 2 个空格。
 4. 写入 `~/.claude/plugins/claude-hud-plus/config.json`。
 5. 如果父目录不存在，创建父目录。

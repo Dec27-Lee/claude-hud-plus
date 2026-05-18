@@ -4,8 +4,6 @@ import * as os from 'node:os';
 import { getHudPluginDir } from './claude-config-dir.js';
 import type { Language } from './i18n/types.js';
 
-export type LineLayoutType = 'compact' | 'expanded';
-
 export type AutocompactBufferMode = 'enabled' | 'disabled';
 export type ContextValueMode = 'percent' | 'tokens' | 'remaining' | 'both';
 export type UsageValueMode = 'percent' | 'remaining';
@@ -21,6 +19,9 @@ export type GitBranchOverflowMode = 'truncate' | 'wrap';
 export type ModelFormatMode = 'full' | 'compact' | 'short';
 export type TimeFormatMode = 'relative' | 'absolute' | 'both';
 export type HudElement = 'project' | 'addedDirs' | 'context' | 'usage' | 'promptCache' | 'memory' | 'environment' | 'tools' | 'agents' | 'todos' | 'sessionTime';
+export type HudRowItem = 'model' | 'contextBar' | 'contextValue' | 'project' | 'git' | 'addedDirs' | 'sessionTokens' | 'usage' | 'promptCache' | 'memory' | 'environment' | 'tools' | 'agents' | 'todos' | 'sessionTime' | 'customLine';
+export type HudRow = HudRowItem[];
+export type RowOverflowMode = 'truncate' | 'wrap';
 
 export type AddedDirsLayout = 'inline' | 'line';
 export type HudColorName =
@@ -70,11 +71,36 @@ export const DEFAULT_MERGE_GROUPS: HudElement[][] = [
   ['context', 'usage'],
 ];
 
+export const DEFAULT_ROWS: HudRow[] = [
+  ['model', 'contextBar', 'contextValue'],
+  ['project', 'addedDirs', 'git'],
+  ['sessionTokens'],
+];
+
 const KNOWN_ELEMENTS = new Set<HudElement>(DEFAULT_ELEMENT_ORDER);
+const KNOWN_ROW_ITEMS = new Set<HudRowItem>([
+  'model',
+  'contextBar',
+  'contextValue',
+  'project',
+  'git',
+  'addedDirs',
+  'sessionTokens',
+  'usage',
+  'promptCache',
+  'memory',
+  'environment',
+  'tools',
+  'agents',
+  'todos',
+  'sessionTime',
+  'customLine',
+]);
 
 export interface HudConfig {
   language: Language;
-  lineLayout: LineLayoutType;
+  rows: HudRow[];
+  rowOverflow: RowOverflowMode;
   showSeparators: boolean;
   pathLevels: 1 | 2 | 3;
   maxWidth: number | null;
@@ -138,7 +164,8 @@ export interface HudConfig {
 
 export const DEFAULT_CONFIG: HudConfig = {
   language: 'en',
-  lineLayout: 'expanded',
+  rows: DEFAULT_ROWS.map(row => [...row]),
+  rowOverflow: 'truncate',
   showSeparators: false,
   pathLevels: 1,
   maxWidth: null,
@@ -159,7 +186,7 @@ export const DEFAULT_CONFIG: HudConfig = {
     showAddedDirs: true,
     addedDirsLayout: 'inline',
     showContextBar: true,
-    contextValue: 'percent',
+    contextValue: 'both',
     showConfigCounts: false,
     showCost: false,
     showDuration: false,
@@ -179,7 +206,7 @@ export const DEFAULT_CONFIG: HudConfig = {
     showMemoryUsage: false,
     showPromptCache: false,
     promptCacheTtlSeconds: 300,
-    showSessionTokens: false,
+    showSessionTokens: true,
     showOutputStyle: false,
     showSessionStartDate: false,
     showLastResponseAt: false,
@@ -221,10 +248,6 @@ export function getConfigPath(): string {
 
 function validatePathLevels(value: unknown): value is 1 | 2 | 3 {
   return value === 1 || value === 2 || value === 3;
-}
-
-function validateLineLayout(value: unknown): value is LineLayoutType {
-  return value === 'compact' || value === 'expanded';
 }
 
 function validateAutocompactBuffer(value: unknown): value is AutocompactBufferMode {
@@ -314,6 +337,47 @@ function validateElementOrder(value: unknown): HudElement[] {
   return elementOrder.length > 0 ? elementOrder : [...DEFAULT_ELEMENT_ORDER];
 }
 
+function validateRows(value: unknown): HudRow[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    return DEFAULT_ROWS.map(row => [...row]);
+  }
+
+  const rows: HudRow[] = [];
+
+  for (const row of value) {
+    if (!Array.isArray(row)) {
+      continue;
+    }
+
+    const normalizedRow: HudRow = [];
+    const seen = new Set<HudRowItem>();
+
+    for (const item of row) {
+      if (typeof item !== 'string' || !KNOWN_ROW_ITEMS.has(item as HudRowItem)) {
+        continue;
+      }
+
+      const rowItem = item as HudRowItem;
+      if (seen.has(rowItem)) {
+        continue;
+      }
+
+      seen.add(rowItem);
+      normalizedRow.push(rowItem);
+    }
+
+    if (normalizedRow.length > 0) {
+      rows.push(normalizedRow);
+    }
+  }
+
+  return rows.length > 0 ? rows : DEFAULT_ROWS.map(row => [...row]);
+}
+
+function validateRowOverflow(value: unknown): RowOverflowMode {
+  return value === 'wrap' || value === 'truncate' ? value : DEFAULT_CONFIG.rowOverflow;
+}
+
 function validateMergeGroups(value: unknown): HudElement[][] {
   if (!Array.isArray(value)) {
     return DEFAULT_MERGE_GROUPS.map(group => [...group]);
@@ -370,20 +434,11 @@ interface LegacyConfig {
 function migrateConfig(userConfig: Partial<HudConfig> & LegacyConfig): Partial<HudConfig> {
   const migrated = { ...userConfig } as Partial<HudConfig> & LegacyConfig;
 
-  if ('layout' in userConfig && !('lineLayout' in userConfig)) {
+  if ('layout' in userConfig) {
     if (typeof userConfig.layout === 'string') {
-      // Legacy string migration (v0.0.x → v0.1.x)
-      if (userConfig.layout === 'separators') {
-        migrated.lineLayout = 'compact';
-        migrated.showSeparators = true;
-      } else {
-        migrated.lineLayout = 'compact';
-        migrated.showSeparators = false;
-      }
+      migrated.showSeparators = userConfig.layout === 'separators';
     } else if (typeof userConfig.layout === 'object' && userConfig.layout !== null) {
-      // Object layout written by third-party tools — extract nested fields
       const obj = userConfig.layout as Record<string, unknown>;
-      if (typeof obj.lineLayout === 'string') migrated.lineLayout = obj.lineLayout as any;
       if (typeof obj.showSeparators === 'boolean') migrated.showSeparators = obj.showSeparators;
       if (typeof obj.pathLevels === 'number') migrated.pathLevels = obj.pathLevels as any;
     }
@@ -434,9 +489,8 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
     ? migrated.language
     : DEFAULT_CONFIG.language;
 
-  const lineLayout = validateLineLayout(migrated.lineLayout)
-    ? migrated.lineLayout
-    : DEFAULT_CONFIG.lineLayout;
+  const rows = validateRows((migrated as Record<string, unknown>).rows);
+  const rowOverflow = validateRowOverflow((migrated as Record<string, unknown>).rowOverflow);
 
   const showSeparators = typeof migrated.showSeparators === 'boolean'
     ? migrated.showSeparators
@@ -638,7 +692,7 @@ export function mergeConfig(userConfig: Partial<HudConfig>): HudConfig {
       : DEFAULT_CONFIG.colors.barEmpty,
   };
 
-  return { language, lineLayout, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, gitStatus, display, colors };
+  return { language, rows, rowOverflow, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, gitStatus, display, colors };
 }
 
 export async function loadConfig(): Promise<HudConfig> {

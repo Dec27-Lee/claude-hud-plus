@@ -19,6 +19,7 @@ export type MessageKey =
   | "status.limitShort"
   | "status.allTodosComplete"
   | "status.expired"
+  | "status.ccrModelHookMissing"
   // Format
   | "format.resets"
   | "format.resetsIn"

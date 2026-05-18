@@ -12,15 +12,10 @@ import { progressLabel } from "./label-align.js";
 const DEBUG =
   process.env.DEBUG?.includes("claude-hud") || process.env.DEBUG === "*";
 
-export function renderIdentityLine(
-  ctx: RenderContext,
-  alignLabels = false,
-): string {
+function getDisplayContextPercent(ctx: RenderContext): number {
   const rawPercent = getContextPercent(ctx.stdin);
   const bufferedPercent = getBufferedPercent(ctx.stdin);
   const autocompactMode = ctx.config?.display?.autocompactBuffer ?? "enabled";
-  const percent = autocompactMode === "disabled" ? rawPercent : bufferedPercent;
-  const colors = ctx.config?.colors;
 
   if (DEBUG && autocompactMode === "disabled") {
     console.error(
@@ -28,14 +23,50 @@ export function renderIdentityLine(
     );
   }
 
+  return autocompactMode === "disabled" ? rawPercent : bufferedPercent;
+}
+
+export function renderContextBarPart(ctx: RenderContext): string | null {
   const display = ctx.config?.display;
+  if (display?.showContextBar === false) {
+    return null;
+  }
+
+  const percent = getDisplayContextPercent(ctx);
+  const colors = ctx.config?.colors;
+  const contextThresholds = {
+    warning: display?.contextWarningThreshold,
+    critical: display?.contextCriticalThreshold,
+  };
+
+  return coloredBar(percent, getAdaptiveBarWidth(), colors, contextThresholds);
+}
+
+export function renderContextValuePart(ctx: RenderContext): string {
+  const percent = getDisplayContextPercent(ctx);
+  const display = ctx.config?.display;
+  const colors = ctx.config?.colors;
   const contextThresholds = {
     warning: display?.contextWarningThreshold,
     critical: display?.contextCriticalThreshold,
   };
   const contextValueMode = display?.contextValue ?? "percent";
   const contextValue = formatContextValue(ctx, percent, contextValueMode);
-  const contextValueDisplay = `${getContextColor(percent, colors, contextThresholds)}${contextValue}${RESET}`;
+  return `${getContextColor(percent, colors, contextThresholds)}${contextValue}${RESET}`;
+}
+
+export function renderIdentityLine(
+  ctx: RenderContext,
+  alignLabels = false,
+): string {
+  const percent = getDisplayContextPercent(ctx);
+  const colors = ctx.config?.colors;
+  const display = ctx.config?.display;
+  const contextThresholds = {
+    warning: display?.contextWarningThreshold,
+    critical: display?.contextCriticalThreshold,
+  };
+  const contextValueDisplay = renderContextValuePart(ctx);
 
   let line =
     display?.showContextBar !== false
@@ -60,7 +91,7 @@ export function renderIdentityLine(
   return line;
 }
 
-function formatTokens(n: number): string {
+export function formatTokens(n: number): string {
   if (n >= 1000000) {
     return `${(n / 1000000).toFixed(1)}M`;
   }
@@ -70,7 +101,7 @@ function formatTokens(n: number): string {
   return n.toString();
 }
 
-function formatContextValue(
+export function formatContextValue(
   ctx: RenderContext,
   percent: number,
   mode: "percent" | "tokens" | "remaining" | "both",

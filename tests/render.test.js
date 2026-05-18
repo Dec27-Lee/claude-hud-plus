@@ -19,6 +19,7 @@ import { renderSessionTokensLine } from '../dist/render/lines/session-tokens.js'
 import { renderSessionTimeLine } from '../dist/render/lines/session-time.js';
 import { getContextColor, getQuotaColor } from '../dist/render/colors.js';
 import { setLanguage } from '../dist/i18n/index.js';
+import { mergeConfig } from '../dist/config.js';
 
 function stripAnsi(str) {
   // eslint-disable-next-line no-control-regex
@@ -102,6 +103,171 @@ function withColumns(stream, columns, fn) {
 function withTerminal(columns, fn) {
   return withColumns(process.stdout, columns, fn);
 }
+
+function snapshotRouterEnv() {
+  return {
+    HOME: process.env.HOME,
+    USERPROFILE: process.env.USERPROFILE,
+    ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
+    ANTHROPIC_API_BASE_URL: process.env.ANTHROPIC_API_BASE_URL,
+  };
+}
+
+function restoreRouterEnv(env) {
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
+
+async function createCcrHome({ writeSessionState = false } = {}) {
+  const root = await mkdtemp(path.join(tmpdir(), 'claude-hud-render-'));
+  const sessionId = '77777777-7777-4777-8777-777777777777';
+  const transcriptPath = path.join(root, 'project', `${sessionId}.jsonl`);
+  const sessionDir = path.join(root, 'project', sessionId);
+  await mkdir(path.join(root, '.claude-code-router'), { recursive: true });
+  await mkdir(sessionDir, { recursive: true });
+  await writeFile(path.join(root, '.claude-code-router', 'config.json'), JSON.stringify({ HOST: '127.0.0.1', PORT: 3456 }));
+  await writeFile(transcriptPath, '{}\n');
+  if (writeSessionState) {
+    await writeFile(path.join(sessionDir, 'ccr-model.json'), JSON.stringify({ model: 'gpt-5.5', provider: 'openrouter' }));
+  }
+  return { root, transcriptPath };
+}
+
+test('render rows layout outputs the default Plus three-line HUD', () => {
+  const ctx = baseContext();
+  ctx.config = mergeConfig({
+    rows: [
+      ['model', 'contextBar', 'contextValue'],
+      ['project', 'git'],
+      ['sessionTokens'],
+    ],
+    rowOverflow: 'truncate',
+    display: {
+      modelOverride: 'gpt-5.5',
+      contextValue: 'both',
+      showSessionTokens: true,
+    },
+  });
+  ctx.stdin.cwd = '/tmp/claude-hud-plus';
+  ctx.stdin.context_window = {
+    context_window_size: 270000,
+    used_percentage: 82,
+    current_usage: {
+      input_tokens: 222000,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+    },
+  };
+  ctx.gitStatus = { branch: 'main', isDirty: true, ahead: 0, behind: 0 };
+  ctx.transcript.sessionTokens = {
+    inputTokens: 11400000,
+    outputTokens: 378000,
+    cacheCreationTokens: 133400000,
+    cacheReadTokens: 0,
+  };
+
+  const lines = withTerminal(120, () => captureRenderLines(ctx));
+
+  assert.deepEqual(lines, [
+    '[gpt-5.5] ████████░░ 82% (222k/270k)',
+    'claude-hud-plus git:(main*)',
+    'Tokens 145.2M (in: 11.4M, out: 378k, cache: 133.4M)',
+  ]);
+});
+
+test('render model item shows localized setup hint when CCR session state is missing', async () => {
+  const env = snapshotRouterEnv();
+  const { root, transcriptPath } = await createCcrHome();
+
+  try {
+    process.env.HOME = root;
+    process.env.USERPROFILE = root;
+    process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456';
+    setLanguage('zh');
+
+    const ctx = baseContext();
+    ctx.config = mergeConfig({ language: 'zh', rows: [['model']], rowOverflow: 'truncate' });
+    ctx.stdin.transcript_path = transcriptPath;
+
+    assert.deepEqual(captureRenderLines(ctx), [
+      '[CCR真实模型未启用：运行 /claude-hud-plus:setup]',
+    ]);
+  } finally {
+    setLanguage('en');
+    restoreRouterEnv(env);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('render model item shows routed model without CCR provider suffix', async () => {
+  const env = snapshotRouterEnv();
+  const { root, transcriptPath } = await createCcrHome({ writeSessionState: true });
+
+  try {
+    process.env.HOME = root;
+    process.env.USERPROFILE = root;
+    process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456';
+
+    const ctx = baseContext();
+    ctx.config = mergeConfig({ rows: [['model']], rowOverflow: 'truncate' });
+    ctx.stdin.transcript_path = transcriptPath;
+
+    assert.deepEqual(captureRenderLines(ctx), ['[gpt-5.5]']);
+  } finally {
+    restoreRouterEnv(env);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('render rows layout supports customLine as a configured row item', () => {
+  const ctx = baseContext();
+  ctx.config = mergeConfig({
+    rows: [['customLine']],
+    display: { customLine: 'Ship it' },
+  });
+
+  assert.deepEqual(captureRenderLines(ctx), ['Ship it']);
+});
+
+test('render rows layout truncates overlong rows by default', () => {
+  const ctx = baseContext();
+  ctx.config = mergeConfig({
+    rows: [['project', 'git']],
+    rowOverflow: 'truncate',
+  });
+  ctx.stdin.cwd = '/tmp/very-long-project-name-for-row-truncation';
+  ctx.gitStatus = { branch: 'feature/very-long-branch-name', isDirty: true, ahead: 0, behind: 0 };
+
+  const lines = withTerminal(20, () => captureRenderLines(ctx));
+
+  assert.equal(lines.length, 1);
+  assert.ok(lines[0].includes('...'), `expected truncated row, got: ${lines[0]}`);
+  assert.ok(lines[0].length <= 20, `expected row to fit width, got: ${lines[0]}`);
+});
+
+test('render rows layout can wrap separator-delimited row content when configured', () => {
+  const ctx = baseContext();
+  ctx.config = mergeConfig({
+    rows: [['usage']],
+    rowOverflow: 'wrap',
+    display: { usageBarEnabled: false, sevenDayThreshold: 0 },
+  });
+  ctx.usageData = {
+    planName: 'Pro',
+    fiveHour: 30,
+    sevenDay: 85,
+    fiveHourResetAt: new Date(Date.now() + 60 * 60 * 1000),
+    sevenDayResetAt: new Date(Date.now() + 28 * 60 * 60 * 1000),
+  };
+
+  const lines = withTerminal(30, () => captureRenderLines(ctx));
+
+  assert.ok(lines.length > 1, `expected wrapped rows, got: ${lines.join(' | ')}`);
+  assert.ok(lines.some(line => line.includes('Usage')), `expected usage line, got: ${lines.join(' | ')}`);
+  assert.ok(lines.some(line => line.includes('Weekly')), `expected weekly continuation, got: ${lines.join(' | ')}`);
+});
 
 async function withDeterministicSpeedCache(fn) {
   const tempConfigDir = await mkdtemp(path.join(tmpdir(), 'claude-hud-render-'));
@@ -526,7 +692,7 @@ test('renderMemoryLine shows approximate system RAM usage in expanded layout whe
   assert.ok(line.includes('(63%)'));
 });
 
-test('renderMemoryLine stays hidden in compact layout even when enabled', () => {
+test('renderMemoryLine renders when memory display is enabled', () => {
   const ctx = baseContext();
   ctx.config.display.showMemoryUsage = true;
   ctx.memoryUsage = {
@@ -536,7 +702,9 @@ test('renderMemoryLine stays hidden in compact layout even when enabled', () => 
     usedPercent: 63,
   };
 
-  assert.equal(renderMemoryLine(ctx), null);
+  const line = stripAnsi(renderMemoryLine(ctx) ?? '');
+  assert.ok(line.includes('Approx RAM'));
+  assert.ok(line.includes('10 GB / 16 GB'));
 });
 
 test('renderProjectLine includes extraLabel when present', () => {

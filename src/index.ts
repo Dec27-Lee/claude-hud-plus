@@ -108,10 +108,9 @@ export async function main(overrides: Partial<MainDeps> = {}): Promise<void> {
     const effortInfo = config.display.showEffortLevel
       ? resolveEffortLevel(stdin.effort)
       : null;
-    const memoryUsage =
-      config.display.showMemoryUsage && config.lineLayout === "expanded"
-        ? await deps.getMemoryUsage()
-        : null;
+    const memoryUsage = config.display.showMemoryUsage
+      ? await deps.getMemoryUsage()
+      : null;
 
     const ctx: RenderContext = {
       stdin,

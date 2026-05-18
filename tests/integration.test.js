@@ -30,7 +30,6 @@ function cliEnv(homeDir) {
     HOME: homeDir,
     CLAUDE_CONFIG_DIR: path.join(homeDir, ".claude"),
     LANG: "C",
-    CLAUDE_HUD_ROUTER_MODEL: "0",
     CLAUDE_HUD_CONTEXT_WINDOW_SIZE: "",
   };
 }
@@ -126,11 +125,12 @@ test("CLI renders added_dirs basenames on the project line", async (t) => {
 
     assert.equal(result.error, undefined, result.error?.message);
     assert.equal(result.status, 0, result.stderr || "non-zero exit");
-    const firstLine = stripAnsi(result.stdout).split("\n")[0];
-    assert.match(firstLine, /\+lib-foo/);
-    assert.match(firstLine, /\+some-other-repo/);
+    const projectLine = stripAnsi(result.stdout).split("\n").find((line) => line.includes("my-project"));
+    assert.ok(projectLine, `expected project line, got:\n${result.stdout}`);
+    assert.match(projectLine, /\+lib-foo/);
+    assert.match(projectLine, /\+some-other-repo/);
     assert.ok(
-      firstLine.indexOf("my-project") < firstLine.indexOf("+lib-foo"),
+      projectLine.indexOf("my-project") < projectLine.indexOf("+lib-foo"),
       "added dirs should come after the project name",
     );
   } finally {
@@ -256,12 +256,12 @@ test("CLI ignores non-string and post-sanitize-empty added_dirs entries", async 
 
     assert.equal(result.error, undefined, result.error?.message);
     assert.equal(result.status, 0, result.stderr || "non-zero exit");
-    const firstLine = stripAnsi(result.stdout).split("\n")[0];
-    assert.match(firstLine, /\+valid-one/);
-    assert.match(firstLine, /\+valid-two/);
-    const plusCount = (firstLine.match(/\+valid-/g) || []).length;
+    const output = stripAnsi(result.stdout);
+    assert.match(output, /\+valid-one/);
+    assert.match(output, /\+valid-two/);
+    const plusCount = (output.match(/\+valid-/g) || []).length;
     assert.equal(plusCount, 2, "only the two valid basenames should render");
-    assert.doesNotMatch(firstLine, /\+ /, "no bare '+' from control-char-only basename");
+    assert.doesNotMatch(output, /\+ /, "no bare '+' from control-char-only basename");
   } finally {
     await rm(homeDir, { recursive: true, force: true });
   }
@@ -304,13 +304,13 @@ test("CLI caps inline added_dirs at 5 with overflow indicator", async (t) => {
     if (skipIfSpawnBlocked(result, t)) return;
 
     assert.equal(result.status, 0, result.stderr || "non-zero exit");
-    const firstLine = stripAnsi(result.stdout).split("\n")[0];
+    const output = stripAnsi(result.stdout);
     for (let i = 1; i <= 5; i++) {
-      assert.match(firstLine, new RegExp(`\\+dir-${i}\\b`));
+      assert.match(output, new RegExp(`\\+dir-${i}\\b`));
     }
-    assert.doesNotMatch(firstLine, /\+dir-6\b/);
-    assert.doesNotMatch(firstLine, /\+dir-7\b/);
-    assert.match(firstLine, /\+2 more/);
+    assert.doesNotMatch(output, /\+dir-6\b/);
+    assert.doesNotMatch(output, /\+dir-7\b/);
+    assert.match(output, /\+2 more/);
   } finally {
     await rm(homeDir, { recursive: true, force: true });
   }
@@ -352,10 +352,10 @@ test("CLI truncates long inline added_dirs basenames", async (t) => {
     if (skipIfSpawnBlocked(result, t)) return;
 
     assert.equal(result.status, 0, result.stderr || "non-zero exit");
-    const firstLine = stripAnsi(result.stdout).split("\n")[0];
-    assert.match(firstLine, /\+a+…/, "long basename should be truncated with ellipsis");
-    assert.doesNotMatch(firstLine, new RegExp(`\\+${longName}`));
-    const m = firstLine.match(/\+(a+…)/);
+    const output = stripAnsi(result.stdout);
+    assert.match(output, /\+a+…/, "long basename should be truncated with ellipsis");
+    assert.doesNotMatch(output, new RegExp(`\\+${longName}`));
+    const m = output.match(/\+(a+…)/);
     assert.ok(m && m[1].length <= 24, `truncated name should be ≤24 chars, got ${m && m[1].length}`);
   } finally {
     await rm(homeDir, { recursive: true, force: true });
@@ -456,10 +456,10 @@ test("CLI renders inline added_dirs even when showProject is false", async (t) =
     if (skipIfSpawnBlocked(result, t)) return;
 
     assert.equal(result.status, 0, result.stderr || "non-zero exit");
-    const firstLine = stripAnsi(result.stdout).split("\n")[0];
-    assert.match(firstLine, /\[Opus\]/, "model bracket should still render (sanity)");
-    assert.doesNotMatch(firstLine, /my-project/, "project name should be hidden");
-    assert.match(firstLine, /\+lib-foo/, "added dirs should still render");
+    const output = stripAnsi(result.stdout);
+    assert.match(output, /\[Opus\]/, "model bracket should still render (sanity)");
+    assert.doesNotMatch(output, /my-project/, "project name should be hidden");
+    assert.match(output, /\+lib-foo/, "added dirs should still render");
   } finally {
     await rm(homeDir, { recursive: true, force: true });
   }

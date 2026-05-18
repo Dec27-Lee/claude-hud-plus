@@ -15,22 +15,19 @@ Claude HUD Plus 是一个基于官方 Claude HUD 的增强型 Claude Code 状态
 
 Claude HUD Plus 保持上游 Claude HUD 代码作为基线，并增加面向路由和长会话场景的源码级能力：
 
-- **真实路由模型显示**：优先读取当前会话目录的 `ccr-model.json`，再回退到 `~/.claude-code-router/runtime/latest-model.json`。
-- **提供商（Provider）标识**：路由状态中可写入 `provider`，HUD 会把实际 provider 显示在模型旁边。
+- **真实路由模型显示**：当 Claude Code 的 `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_BASE_URL` 与 CCR 配置的 `HOST` / `PORT` 匹配时，读取当前会话目录的 `ccr-model.json`。
 - **上下文窗口（context window）覆盖**：设置 `CLAUDE_HUD_CONTEXT_WINDOW_SIZE=270000` 可覆盖展示用上下文窗口，并重算使用百分比。
-- **终端宽度稳定性**：上游宽度逻辑已支持 `COLUMNS`；宽度探测不准时可设置 `COLUMNS=140`，或使用 `maxWidth` / `forceMaxWidth`。
+- **终端宽度稳定性**：默认动态探测终端宽度；只有需要兜底或强制宽度时，才在 HUD 配置中设置 `maxWidth` / `forceMaxWidth`。
 
-默认会在本地 CCR 地址（`localhost:3456` 或 `127.0.0.1:3456`）下自动启用路由模型读取。其他路由工具可设置 `CLAUDE_HUD_ROUTER_MODEL=1`，禁用则设置 `CLAUDE_HUD_ROUTER_MODEL=0`。
+路由模型显示不需要额外配置开关。HUD 会自动对比 Claude Code 当前请求地址和 `~/.claude-code-router/config.json` 中的 CCR 监听地址；只有确认当前会话正在走 CCR 时，才读取当前会话级模型状态文件。如果正在走 CCR 但会话状态文件缺失，模型组件会显示 `CCR真实模型未启用：运行 /claude-hud-plus:setup`，避免把 Claude Code 原始请求模型误显示为真实路由模型。
+
+可选环境变量：
 
 ```bash
-CLAUDE_HUD_ROUTER_MODEL=1
-CLAUDE_HUD_ROUTER_MODEL_STATE_PATH="$HOME/.claude-code-router/runtime/latest-model.json"
-CLAUDE_HUD_ROUTER_MODEL_MAX_AGE_MS=120000
 CLAUDE_HUD_CONTEXT_WINDOW_SIZE=270000
-COLUMNS=140
 ```
 
-路由层需要负责写入状态文件；Claude HUD Plus 只读取约定文件，不默认 修改全局 `node_modules` 或路由器打包文件。
+路由层需要负责写入会话级状态文件；Claude HUD Plus 只读取约定文件，不默认静默修改全局 `node_modules` 或路由器打包文件。需要启用 CCR 会话模型 hook 时，运行 `/claude-hud-plus:setup` 并按提示确认。
 
 ## 安装
 
@@ -106,13 +103,17 @@ Claude HUD 让你在 Claude Code 会话中获得更清晰的洞察。
 
 ## 显示效果
 
-### 默认（2 行）
+### 默认（三行，可配置）
 ```
-[Opus] │ my-project git:(main*)
-上下文 █████░░░░░ 45% │ 使用率 ██░░░░░░░░ 25%（1小时30分 / 5小时）
+[Opus] █████░░░░░ 45% (90k/200k)
+my-project git:(main*)
+Tokens 145.2M (in: 11.4M, out: 378k, cache: 133.4M)
 ```
-- **第 1 行** — 模型、提供商标签（如能正面识别，例如 `Bedrock`、`Vertex`）、项目路径、git 分支
-- **第 2 行** — 上下文进度条（绿 → 黄 → 红）和使用率限制
+- **第 1 行** — 模型、上下文进度条和上下文数值
+- **第 2 行** — 项目路径和 git 分支
+- **第 3 行** — 当前会话累计 Token
+
+布局由 `config.json` 中的 `rows` 定义，想显示几行、每行包含哪些组件都可以调整。Claude Code 原生的权限模式提示（如 bypass permissions）不属于 HUD 输出，不需要在这里配置。
 
 ### 可选行（通过 `/claude-hud-plus:configure` 启用）
 ```
@@ -128,7 +129,7 @@ Claude HUD 让你在 Claude Code 会话中获得更清晰的洞察。
 Claude HUD 使用 Claude Code 原生的**状态栏接口**——无需独立窗口，不需要 tmux，在任何终端都能工作。
 
 ```
-Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
+Claude Code → stdin JSON → claude-hud-plus → stdout → 在终端中显示
            ↘ transcript JSONL（工具、Agent、待办）
 ```
 
@@ -148,10 +149,10 @@ Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
 /claude-hud-plus:configure
 ```
 
-引导式配置涵盖布局、语言和常用显示开关。高级选项如自定义颜色和阈值仍然保留，但你需要直接编辑配置文件来设置它们：
+引导式配置涵盖行布局、语言和常用显示开关。高级选项如自定义颜色和阈值仍然保留，但你需要直接编辑配置文件来设置它们：
 
 - **首次设置**：选择预设（完整/核心/极简），选择标签语言，然后微调各个元素
-- **随时自定义**：开关各项、调整 Git 显示样式、切换布局或更改标签语言
+- **随时自定义**：开关各项、调整 Git 显示样式、调整 `rows` 行布局或更改标签语言
 - **保存前预览**：在提交更改前精确预览 HUD 的效果
 
 ### 预设
@@ -166,7 +167,7 @@ Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
 
 ### 手动配置
 
-直接编辑 `~/.claude/plugins/claude-hud-plus/config.json` 来配置高级选项，如 `colors.*`、`pathLevels`、阈值覆盖、`display.timeFormat` 以及 `display.promptCacheTtlSeconds`。运行 `/claude-hud-plus:configure` 时会保留这些手动设置，同时你仍可更改 `language`、布局和常用引导式开关。
+直接编辑 `~/.claude/plugins/claude-hud-plus/config.json` 来配置高级选项，如 `rows`、`rowOverflow`、`colors.*`、`pathLevels`、阈值覆盖、`display.timeFormat` 以及 `display.promptCacheTtlSeconds`。运行 `/claude-hud-plus:configure` 时会保留这些手动设置，同时你仍可更改 `language`、行布局和常用引导式开关。
 
 中文 HUD 标签作为默认关闭、需显式启用的选项提供。除非你在 `/claude-hud-plus:configure` 中选择 `中文` 或在配置中设置 `language`，否则默认使用英文。
 
@@ -175,10 +176,13 @@ Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
 | 选项 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `language` | `en` \| `zh` | `en` | HUD 标签语言。默认为英文；设为 `zh` 启用中文标签 |
-| `lineLayout` | string | `expanded` | 布局：`expanded`（多行）或 `compact`（单行） |
+| `rows` | string[][] | `[["model","contextBar","contextValue"],["project","git"],["sessionTokens"]]` | HUD 行布局；外层数组定义行，内层数组定义该行显示的组件 |
+| `rowOverflow` | `truncate` \| `wrap` | `truncate` | 行超出终端宽度时截断，或在可分隔处换行 |
 | `pathLevels` | 1-3 | 1 | 项目路径显示的目录层级数 |
-| `elementOrder` | string[] | `["project","context","usage","promptCache","memory","environment","tools","agents","todos"]` | 展开模式下元素的顺序。省略的条目在展开模式下隐藏 |
-| `display.mergeGroups` | string[][] | `[["context","usage"]]` | 展开模式下相邻时应共享一行的元素分组。设为 `[]` 可禁用合并行 |
+| `maxWidth` | number \| null | null | 终端宽度探测失败时的兜底宽度；默认不设置，优先动态读取实际终端宽度 |
+| `forceMaxWidth` | boolean | false | 是否强制使用 `maxWidth` 覆盖动态探测到的终端宽度 |
+| `elementOrder` | string[] | legacy | 旧展开布局的内部兼容字段；新配置请使用 `rows` |
+| `display.mergeGroups` | string[][] | legacy | 旧展开布局的内部兼容字段；新配置请使用 `rows` 控制行组合 |
 | `gitStatus.enabled` | boolean | true | 在 HUD 中显示 git 分支 |
 | `gitStatus.showDirty` | boolean | true | 显示 `*` 表示未提交的更改 |
 | `gitStatus.showAheadBehind` | boolean | false | 显示 `↑N ↓N` 表示领先/落后远程的提交数 |
@@ -188,7 +192,7 @@ Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
 | `gitStatus.branchOverflow` | `truncate` \| `wrap` | `truncate` | 保持当前截断行为，或在可能时让 git 块以自己的换行边界单独换到下一行 |
 | `display.showModel` | boolean | true | 显示模型名称 `[Opus]` |
 | `display.showContextBar` | boolean | true | 显示可视化上下文进度条 `████░░░░░░` |
-| `display.contextValue` | `percent` \| `tokens` \| `remaining` \| `both` | `percent` | 上下文显示格式（`45%`、`45k/200k`、剩余 `55%` 或 `45% (45k/200k)`） |
+| `display.contextValue` | `percent` \| `tokens` \| `remaining` \| `both` | `both` | 上下文显示格式（`45%`、`45k/200k`、剩余 `55%` 或 `45% (45k/200k)`） |
 | `display.showConfigCounts` | boolean | false | 显示 CLAUDE.md、rules、MCPs、hooks 数量 |
 | `display.showCost` | boolean | false | 使用 Claude Code 原生提供的 `cost.total_cost_usd` 显示会话费用（可用时），并附带本地估算回退方案 |
 | `display.showOutputStyle` | boolean | false | 从配置文件显示当前 Claude Code `outputStyle`，中文标签下格式为 `样式: <名称>` |
@@ -205,8 +209,9 @@ Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
 | `display.showAgents` | boolean | false | 显示 Agent 活动行 |
 | `display.showTodos` | boolean | false | 显示待办进度行 |
 | `display.showSessionName` | boolean | false | 显示会话 slug 或 `/rename` 设置的自定义标题 |
+| `display.showSessionTokens` | boolean | true | 显示当前会话累计 Token；默认 rows 的第三行使用它 |
 | `display.showClaudeCodeVersion` | boolean | false | 显示已安装的 Claude Code 版本，如 `CC v2.1.81` |
-| `display.showMemoryUsage` | boolean | false | 在展开布局中显示近似系统 RAM 使用行 |
+| `display.showMemoryUsage` | boolean | false | 当 `rows` 中包含 `"memory"` 时显示近似系统 RAM 使用行 |
 | `display.showPromptCache` | boolean | false | 根据 transcript 中最后一次 assistant 响应时间显示提示缓存倒计时 |
 | `display.promptCacheTtlSeconds` | number | `300` | 提示缓存 TTL 秒数。Pro 保持默认值，Max 可设为 `3600` |
 | `colors.context` | 颜色值 | `green` | 上下文进度条和百分比的基础颜色 |
@@ -223,7 +228,7 @@ Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
 
 支持的颜色名称：`dim`、`red`、`green`、`yellow`、`magenta`、`cyan`、`brightBlue`、`brightMagenta`。你也可以使用 256 色数字（`0-255`）或十六进制（`#rrggbb`）。
 
-`display.showMemoryUsage` 默认关闭、需显式启用，仅在 `expanded` 布局下渲染。它报告本地机器的近似系统 RAM 使用情况，而非 Claude Code 或特定进程内的精确内存压力。由于可回收的 OS 缓存缓冲区仍可能被计入已用内存，该数字可能高估实际压力。
+`display.showMemoryUsage` 默认关闭、需显式启用；启用后可通过在 `rows` 中加入 `"memory"` 渲染。它报告本地机器的近似系统 RAM 使用情况，而非 Claude Code 或特定进程内的精确内存压力。由于可回收的 OS 缓存缓冲区仍可能被计入已用内存，该数字可能高估实际压力。
 
 `display.showCost` 默认关闭、需显式启用。ClaudeHUD 优先使用 Claude Code 在 stdin 上提供的原生 `cost.total_cost_usd` 字段（可用时）。如果该字段缺失或对直连 Anthropic 会话无效，ClaudeHUD 会回退到现有的基于本地转录文件的估算方案，确保费用行在旧负载下仍能工作。原生字段在会话中首个 API 响应之前为空，因此费用显示可能在响应到达前保持隐藏。对于已知的路由提供商（如 Bedrock、Vertex AI），ClaudeHUD 也会隐藏费用显示，因为云提供商计费会话可能报告 `$0.00` 或省略该字段，即使会话并非真正免费。
 
@@ -231,7 +236,7 @@ Claude Code → stdin JSON → claude-hud → stdout → 在终端中显示
 
 ### 使用率限制
 
-当 Claude Code 在 stdin 上提供订阅用户 `rate_limits` 数据时，使用率显示**默认启用**。它会在第 2 行 与上下文进度条一起显示你的使用率消耗。
+当 Claude Code 在 stdin 上提供订阅用户 `rate_limits` 数据时，使用率组件默认可用。若要显示它，请在 `rows` 中加入 `"usage"`，例如追加 `["usage"]` 或把它放到上下文行。
 
 ClaudeHUD 优先使用官方状态栏 stdin 负载中的使用率数据。如果 `rate_limits` 缺失，你可以通过 `display.externalUsagePath` 显式启用本地旁路快照回退，例如让代理程序写入 JSON 文件。只要 stdin 和本地旁路快照同时存在，stdin 始终优先。
 
@@ -285,9 +290,16 @@ ClaudeHUD 优先使用官方状态栏 stdin 负载中的使用率数据。如果
 ```json
 {
   "language": "zh",
-  "lineLayout": "expanded",
+  "rows": [
+    ["model", "contextBar", "contextValue"],
+    ["project", "addedDirs", "git"],
+    ["sessionTokens"],
+    ["tools"],
+    ["agents"],
+    ["todos"]
+  ],
+  "rowOverflow": "truncate",
   "pathLevels": 2,
-  "elementOrder": ["project", "tools", "context", "usage", "memory", "environment", "agents", "todos"],
   "gitStatus": {
     "enabled": true,
     "showDirty": true,
@@ -338,7 +350,7 @@ ClaudeHUD 优先使用官方状态栏 stdin 负载中的使用率数据。如果
 
 **配置不生效？**
 - 检查 JSON 语法错误：无效的 JSON 会静默回退到默认值
-- 确保值有效：`pathLevels` 必须是 1、2 或 3；`lineLayout` 必须是 `expanded` 或 `compact`
+- 确保值有效：`pathLevels` 必须是 1、2 或 3；`rowOverflow` 必须是 `truncate` 或 `wrap`；`maxWidth` 必须是正数
 - 删除配置文件并运行 `/claude-hud-plus:configure` 重新生成
 
 **Git 状态缺失？**

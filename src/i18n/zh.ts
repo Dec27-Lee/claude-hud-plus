@@ -22,6 +22,7 @@ export const zh: Messages = {
   "status.limitShort": "上限",
   "status.allTodosComplete": "全部完成",
   "status.expired": "已过期",
+  "status.ccrModelHookMissing": "CCR真实模型未启用：运行 /claude-hud-plus:setup",
 
   // Format
   "format.resets": "重置于",

@@ -7,6 +7,7 @@ import {
   DEFAULT_CONFIG,
   DEFAULT_ELEMENT_ORDER,
   DEFAULT_MERGE_GROUPS,
+  DEFAULT_ROWS,
 } from '../dist/config.js';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -27,9 +28,8 @@ test('loadConfig returns valid config structure', async () => {
   // pathLevels must be 1, 2, or 3
   assert.ok([1, 2, 3].includes(config.pathLevels), 'pathLevels should be 1, 2, or 3');
 
-  // lineLayout must be valid
-  const validLineLayouts = ['compact', 'expanded'];
-  assert.ok(validLineLayouts.includes(config.lineLayout), 'lineLayout should be valid');
+  assert.deepEqual(config.rows, DEFAULT_ROWS, 'rows should default to the Plus three-line layout');
+  assert.equal(config.rowOverflow, 'truncate', 'rowOverflow should default to truncate');
 
   // showSeparators must be boolean
   assert.equal(typeof config.showSeparators, 'boolean', 'showSeparators should be boolean');
@@ -362,7 +362,8 @@ test('loadConfig reads user config from CLAUDE_CONFIG_DIR', async () => {
     await writeFile(
       path.join(pluginDir, 'config.json'),
       JSON.stringify({
-        lineLayout: 'compact',
+        rows: [['project', 'git'], ['usage']],
+        rowOverflow: 'wrap',
         pathLevels: 2,
         display: { showSpeed: true },
       }),
@@ -370,7 +371,8 @@ test('loadConfig reads user config from CLAUDE_CONFIG_DIR', async () => {
     );
 
     const config = await loadConfig();
-    assert.equal(config.lineLayout, 'compact');
+    assert.deepEqual(config.rows, [['project', 'git'], ['usage']]);
+    assert.equal(config.rowOverflow, 'wrap');
     assert.equal(config.pathLevels, 2);
     assert.equal(config.display.showSpeed, true);
   } finally {
@@ -381,45 +383,32 @@ test('loadConfig reads user config from CLAUDE_CONFIG_DIR', async () => {
 
 // --- migrateConfig tests (via mergeConfig) ---
 
-test('migrate legacy layout: "default" -> compact, no separators', () => {
+test('migrate legacy layout: "default" -> no separators', () => {
   const config = mergeConfig({ layout: 'default' });
-  assert.equal(config.lineLayout, 'compact');
   assert.equal(config.showSeparators, false);
 });
 
-test('migrate legacy layout: "separators" -> compact, with separators', () => {
+test('migrate legacy layout: "separators" -> with separators', () => {
   const config = mergeConfig({ layout: 'separators' });
-  assert.equal(config.lineLayout, 'compact');
   assert.equal(config.showSeparators, true);
 });
 
-test('migrate object layout: extracts nested fields to top level', () => {
+test('migrate object layout: extracts supported nested fields to top level', () => {
   const config = mergeConfig({
     layout: { lineLayout: 'expanded', showSeparators: true, pathLevels: 2 },
   });
-  assert.equal(config.lineLayout, 'expanded');
   assert.equal(config.showSeparators, true);
   assert.equal(config.pathLevels, 2);
 });
 
 test('migrate object layout: empty object does not crash', () => {
   const config = mergeConfig({ layout: {} });
-  // Should fall back to defaults since no fields were extracted
-  assert.equal(config.lineLayout, DEFAULT_CONFIG.lineLayout);
   assert.equal(config.showSeparators, DEFAULT_CONFIG.showSeparators);
   assert.equal(config.pathLevels, DEFAULT_CONFIG.pathLevels);
 });
 
 test('no layout key -> no migration, uses defaults', () => {
   const config = mergeConfig({});
-  assert.equal(config.lineLayout, DEFAULT_CONFIG.lineLayout);
-  assert.equal(config.showSeparators, DEFAULT_CONFIG.showSeparators);
-});
-
-test('both layout and lineLayout present -> layout ignored', () => {
-  const config = mergeConfig({ layout: 'separators', lineLayout: 'expanded' });
-  // When lineLayout is already present, migration should not run
-  assert.equal(config.lineLayout, 'expanded');
   assert.equal(config.showSeparators, DEFAULT_CONFIG.showSeparators);
 });
 
@@ -468,7 +457,42 @@ test('mergeConfig falls back to default for invalid usageValue', () => {
   assert.equal(config.display.usageValue, DEFAULT_CONFIG.display.usageValue);
 });
 
-test('mergeConfig defaults elementOrder to the full expanded layout', () => {
+test('mergeConfig defaults rows to the Plus three-line layout', () => {
+  const config = mergeConfig({});
+  assert.deepEqual(config.rows, DEFAULT_ROWS);
+});
+
+test('mergeConfig accepts valid rows and filters invalid entries', () => {
+  const config = mergeConfig({
+    rows: [
+      ['model', 'unknown', 'contextBar', 'contextBar', 'contextValue'],
+      ['project', 'git'],
+      [],
+      'usage',
+      ['sessionTokens'],
+    ],
+  });
+
+  assert.deepEqual(config.rows, [
+    ['model', 'contextBar', 'contextValue'],
+    ['project', 'git'],
+    ['sessionTokens'],
+  ]);
+});
+
+test('mergeConfig falls back to default rows when rows is empty or invalid', () => {
+  assert.deepEqual(mergeConfig({ rows: [] }).rows, DEFAULT_ROWS);
+  assert.deepEqual(mergeConfig({ rows: [['unknown']] }).rows, DEFAULT_ROWS);
+  assert.deepEqual(mergeConfig({ rows: 'project' }).rows, DEFAULT_ROWS);
+});
+
+test('mergeConfig validates rowOverflow', () => {
+  assert.equal(mergeConfig({ rowOverflow: 'wrap' }).rowOverflow, 'wrap');
+  assert.equal(mergeConfig({ rowOverflow: 'truncate' }).rowOverflow, 'truncate');
+  assert.equal(mergeConfig({ rowOverflow: 'clip' }).rowOverflow, 'truncate');
+});
+
+test('mergeConfig keeps elementOrder available for legacy expanded helpers', () => {
   const config = mergeConfig({});
   assert.deepEqual(config.elementOrder, DEFAULT_ELEMENT_ORDER);
 });

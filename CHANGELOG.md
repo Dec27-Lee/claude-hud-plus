@@ -12,8 +12,10 @@
 
 ### 已新增
 
-- Plus 路由模型读取：优先读取会话级 `ccr-model.json`，再回退到 `~/.claude-code-router/runtime/latest-model.json`。
+- 新增 `rows` / `rowOverflow` 行布局配置，默认渲染模型+上下文、项目+Git、会话 Token 三行 HUD。
+- Plus 路由模型读取：自动对比 Claude Code 当前请求地址与 CCR 配置 `HOST` / `PORT`，确认匹配后读取当前会话级 `ccr-model.json`；状态文件缺失时模型组件显示运行 setup 的中英文提示。
 - Plus 上下文窗口覆盖：支持通过 `CLAUDE_HUD_CONTEXT_WINDOW_SIZE` 覆盖展示用上下文窗口大小并重算百分比。
+- `scripts/patch-ccr-session-model.cjs`，用于在 setup 用户确认后备份并修补 CCR，使其写入会话级真实模型状态。
 - `src/plus/` 模块边界，用于放置 Plus 专属增强能力。
 
 ## [0.1.0] - 初始 Plus 版本

@@ -119,14 +119,14 @@ $claudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-
 推荐命令模式：
 
 ```bash
-bash -c 'cols=$(stty size </dev/tty 2>/dev/null | awk '\''{print $2}'\''); export COLUMNS=$(( ${cols:-140} > 4 ? ${cols:-140} - 4 : 140 )); plugin_dir=$(ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/claude-hud-plus/*/ 2>/dev/null | sort -V | tail -1); exec "{RUNTIME_PATH}" "${plugin_dir}{SOURCE}"'
+bash -c 'cols=$(stty size </dev/tty 2>/dev/null | awk '\''{print $2}'\''); if [ -n "$cols" ] && [ "$cols" -gt 4 ]; then export CLAUDE_HUD_TERMINAL_WIDTH=$((cols - 4)); fi; plugin_dir=$(ls -1d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/*/claude-hud-plus/*/ 2>/dev/null | sort -V | tail -1); exec "{RUNTIME_PATH}" "${plugin_dir}{SOURCE}"'
 ```
 
 其中：
 
 - `{RUNTIME_PATH}` 替换为检测到的 `node` 或 `bun`
 - `{SOURCE}` 通常是 `dist/index.js`
-- `COLUMNS` 默认兜底为 140，避免部分终端宽度探测失败
+- `CLAUDE_HUD_TERMINAL_WIDTH` 由命令每次从当前终端动态探测并传给 HUD；用户不需要手动设置宽度
 
 ### Windows PowerShell
 
@@ -142,7 +142,7 @@ New-Item -ItemType Directory -Force -Path $wrapperDir | Out-Null
 包装脚本内容应：
 
 1. 查找最新 `claude-hud-plus` 插件版本目录。
-2. 设置 `$env:COLUMNS`，如果无法获取窗口宽度则用 `140`。
+2. 每次运行时动态读取当前窗口宽度，并写入 `$env:CLAUDE_HUD_TERMINAL_WIDTH`。
 3. 执行 Node.js：`node dist/index.js`。
 4. 透传标准输入、标准输出和标准错误（stdin/stdout/stderr）。
 
@@ -182,13 +182,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{WRAPPER_PATH}"
 ```json
 {
   "env": {
-    "CLAUDE_HUD_CONTEXT_WINDOW_SIZE": "270000",
-    "COLUMNS": "140"
+    "CLAUDE_HUD_CONTEXT_WINDOW_SIZE": "270000"
   }
 }
 ```
 
-不要默认覆盖用户已有 env；只在用户选择启用时合并。
+不要默认覆盖用户已有 env；只在用户选择启用时合并。终端宽度默认由 statusLine 命令动态探测，不要把固定宽度写入 settings env。
 
 ---
 
@@ -222,7 +221,53 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{WRAPPER_PATH}"
 
 ---
 
-## 步骤 7：验证
+## 步骤 7：可选启用 CCR 真实模型 hook
+
+如果检测到用户正在使用 CCR（Claude Code 的 `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_BASE_URL` 和 `~/.claude-code-router/config.json` 的 `HOST` / `PORT` 匹配），检查插件目录中的脚本：
+
+```text
+{PLUGIN_VERSION_DIR}/scripts/patch-ccr-session-model.cjs
+```
+
+先执行 dry-run，不修改 CCR：
+
+```bash
+node "{PLUGIN_VERSION_DIR}/scripts/patch-ccr-session-model.cjs" --dry-run --json
+```
+
+如果 dry-run 显示 `targets.ccr.distPatched` 为 `false`，或者 diagnostics 显示 patch 缺失/过旧/结构异常，询问用户：
+
+- header: `CCR 模型`
+- question: `检测到你正在使用 CCR，但真实路由模型 hook 尚未启用或需要更新。是否现在启用？这会备份并修补 CCR 的 dist/cli.js，使其写入当前会话 ccr-model.json。`
+- multiSelect: false
+- options:
+  - `启用` — 自动备份并修补 CCR，然后提示重启 CCR
+  - `跳过` — 不修改 CCR；HUD 的模型组件会持续提示运行 /claude-hud-plus:setup
+
+只有用户选择 `启用` 后，才执行：
+
+```bash
+node "{PLUGIN_VERSION_DIR}/scripts/patch-ccr-session-model.cjs" --apply --json
+node --check "<apply 输出里的 targets.ccr.distPath>"
+```
+
+成功后提示：
+
+```text
+CCR 真实模型 hook 已启用。请运行 ccr restart 或重启 CCR，然后重新发起一次 Claude Code 请求。
+```
+
+如果 apply 或 `node --check` 失败，提示用户不要继续使用本次 patch，并建议执行回滚：
+
+```bash
+node "{PLUGIN_VERSION_DIR}/scripts/patch-ccr-session-model.cjs" --restore --json
+```
+
+不要在用户未确认时自动 patch 全局 CCR。
+
+---
+
+## 步骤 8：验证
 
 写入完成后，执行一次生成的 statusLine 命令 做冒烟验证。
 
@@ -272,17 +317,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{WRAPPER_PATH}"
 
 ### 终端宽度异常
 
-建议设置：
+默认情况下，statusLine 命令会在每次运行时动态探测终端宽度，并通过 `CLAUDE_HUD_TERMINAL_WIDTH` 传给 HUD，用户不需要手动设置。
+
+如果确实需要兜底或强制宽度，请在 HUD 配置文件中设置：
 
 ```json
 {
-  "env": {
-    "COLUMNS": "140"
-  }
+  "maxWidth": 140,
+  "forceMaxWidth": false
 }
 ```
 
-或在 HUD 配置中设置 `maxWidth` / `forceMaxWidth`。
+其中 `maxWidth` 只在终端宽度探测失败时作为兜底；如果要强制使用固定宽度，再设置 `forceMaxWidth: true`。
 
 ### 路由模型没有显示真实模型
 
@@ -291,11 +337,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{WRAPPER_PATH}"
 检查：
 
 ```text
-~/.claude-code-router/runtime/latest-model.json
+~/.claude-code-router/config.json
 ~/.claude/projects/<project>/<sessionId>/ccr-model.json
 ```
 
-如果文件不存在，HUD 会回退显示 Claude Code 原始模型。
+HUD 会先确认 Claude Code 当前 `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_BASE_URL` 和 CCR 配置中的 `HOST` / `PORT` 匹配，再读取当前会话级模型状态文件。如果地址不匹配，会显示 Claude Code 原始模型；如果地址匹配但会话状态文件不存在，模型组件会提示运行 `/claude-hud-plus:setup` 启用真实模型 hook。
 
 ---
 

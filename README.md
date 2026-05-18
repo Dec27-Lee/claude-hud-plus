@@ -15,22 +15,19 @@ A Claude Code plugin that shows what's happening — context usage, active tools
 
 Claude HUD Plus keeps the upstream Claude HUD codebase as its baseline, then adds source-level support for router-heavy and long-running Claude Code sessions:
 
-- **Routed model display**: when enabled, the HUD reads the actual model selected by an API router from the current session's `ccr-model.json`, then falls back to `~/.claude-code-router/runtime/latest-model.json`.
-- **Provider labeling**: routed model state may include `provider`, which is shown beside the model so the requested local model and actual routed provider can be distinguished.
+- **Routed model display**: when Claude Code's `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_BASE_URL` matches the `HOST` / `PORT` in the CCR config, the HUD reads the actual model selected by the router from the current session's `ccr-model.json`.
 - **Context window override**: set `CLAUDE_HUD_CONTEXT_WINDOW_SIZE=270000` or another positive integer to override the displayed context window size and recompute usage percentage.
-- **Terminal width stability**: upstream width handling already honors `COLUMNS`; set `COLUMNS=140` or configure `maxWidth`/`forceMaxWidth` when terminal width detection is unreliable.
+- **Terminal width stability**: terminal width is detected dynamically by default; configure `maxWidth` / `forceMaxWidth` only when detection is unreliable or you want a fixed render width.
 
-Router model state is enabled automatically for the default local CCR endpoint (`localhost:3456` or `127.0.0.1:3456`). For other routers, set `CLAUDE_HUD_ROUTER_MODEL=1`. Set `CLAUDE_HUD_ROUTER_MODEL=0` to disable it. Optional environment variables:
+Routed model display does not require a manual enable/disable switch. The HUD compares Claude Code's current request URL with the CCR listener in `~/.claude-code-router/config.json`; it only reads the current session's router model state when the current session is confirmed to be using CCR. If CCR is in use but the session state file is missing, the model component shows `CCR model hook missing: run /claude-hud-plus:setup` instead of misleadingly showing Claude Code's requested model as the routed model.
+
+Optional environment variables:
 
 ```bash
-CLAUDE_HUD_ROUTER_MODEL=1
-CLAUDE_HUD_ROUTER_MODEL_STATE_PATH="$HOME/.claude-code-router/runtime/latest-model.json"
-CLAUDE_HUD_ROUTER_MODEL_MAX_AGE_MS=120000
 CLAUDE_HUD_CONTEXT_WINDOW_SIZE=270000
-COLUMNS=140
 ```
 
-The router layer must write state files for the HUD to show actual routed models. Claude HUD Plus reads this contract but does not patch global `node_modules` or router bundles by default.
+The router layer must write session-level state files for the HUD to show actual routed models. Claude HUD Plus reads this contract but does not silently patch global `node_modules` or router bundles by default. To enable the CCR session-model hook, run `/claude-hud-plus:setup` and confirm the prompt.
 
 ## Install
 
@@ -107,13 +104,17 @@ Claude HUD gives you better insights into what's happening in your Claude Code s
 
 ## What You See
 
-### Default (2 lines)
+### Default (3 configurable rows)
 ```
-[Opus] │ my-project git:(main*)
-Context █████░░░░░ 45% │ Usage ██░░░░░░░░ 25% (1h 30m / 5h)
+[Opus] █████░░░░░ 45% (90k/200k)
+my-project git:(main*)
+Tokens 145.2M (in: 11.4M, out: 378k, cache: 133.4M)
 ```
-- **Line 1** — Model, provider label when positively identified (for example `Bedrock`, `Vertex`), project path, git branch
-- **Line 2** — Context bar (green → yellow → red) and usage rate limits
+- **Line 1** — Model, context bar, and context value
+- **Line 2** — Project path and git branch
+- **Line 3** — Cumulative session tokens
+
+The layout is defined by `rows` in `config.json`, so you can choose how many lines to render and which components appear on each line. Claude Code's native permission-mode prompt, such as bypass permissions, is not rendered by the HUD.
 
 ### Optional lines (enable via `/claude-hud-plus:configure`)
 ```
@@ -149,11 +150,11 @@ Customize your HUD anytime:
 /claude-hud-plus:configure
 ```
 
-The guided flow handles layout, language, and common display toggles. Advanced overrides such as
+The guided flow handles row layout, language, and common display toggles. Advanced overrides such as
 custom colors and thresholds are preserved there, but you set them by editing the config file directly:
 
 - **First time setup**: Choose a preset (Full/Essential/Minimal), pick a label language, then fine-tune individual elements
-- **Customize anytime**: Toggle items on/off, adjust git display style, switch layouts, or change label language
+- **Customize anytime**: Toggle items on/off, adjust git display style, update `rows`, or change label language
 - **Preview before saving**: See exactly how your HUD will look before committing changes
 
 ### Presets
@@ -168,9 +169,9 @@ After choosing a preset, you can turn individual elements on or off.
 
 ### Manual Configuration
 
-Edit `~/.claude/plugins/claude-hud-plus/config.json` directly for advanced settings such as `colors.*`,
+Edit `~/.claude/plugins/claude-hud-plus/config.json` directly for advanced settings such as `rows`, `rowOverflow`, `colors.*`,
 `pathLevels`, `maxWidth`, threshold overrides, `display.timeFormat`, and `display.promptCacheTtlSeconds`. Running `/claude-hud-plus:configure`
-preserves those manual settings while still letting you change `language`, layout, and the common
+preserves those manual settings while still letting you change `language`, row layout, and the common
 guided toggles.
 
 Chinese HUD labels are available as an explicit opt-in. English stays the default unless you choose `中文` in `/claude-hud-plus:configure` or set `language` in config.
@@ -180,12 +181,13 @@ Chinese HUD labels are available as an explicit opt-in. English stays the defaul
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `language` | `en` \| `zh` | `en` | HUD label language. English is the default; set `zh` to enable Chinese labels. |
-| `lineLayout` | string | `expanded` | Layout: `expanded` (multi-line) or `compact` (single line) |
+| `rows` | string[][] | `[["model","contextBar","contextValue"],["project","git"],["sessionTokens"]]` | HUD row layout. The outer array defines lines; each inner array defines components on that line. |
+| `rowOverflow` | `truncate` \| `wrap` | `truncate` | Truncate overlong rows, or wrap at supported separator boundaries. |
 | `pathLevels` | 1-3 | 1 | Directory levels to show in project path |
 | `maxWidth` | number \| `null` | `null` | Optional fallback width used only when terminal width detection fails completely |
 | `forceMaxWidth` | boolean | false | Always use `maxWidth` when it is set, even if terminal width detection returns a smaller value |
-| `elementOrder` | string[] | `["project","context","usage","promptCache","memory","environment","tools","agents","todos","sessionTime"]` | Expanded-mode element order. Omit entries to hide them in expanded mode. Existing configs keep their explicit order until updated. |
-| `display.mergeGroups` | string[][] | `[["context","usage"]]` | Expanded-mode groups that should share a line when adjacent. Set `[]` to disable merged lines. |
+| `elementOrder` | string[] | legacy | Internal compatibility field for the old expanded layout. New configs should use `rows`. |
+| `display.mergeGroups` | string[][] | legacy | Internal compatibility field for the old expanded layout. New configs should use `rows` to group components. |
 | `gitStatus.enabled` | boolean | true | Show git branch in HUD |
 | `gitStatus.showDirty` | boolean | true | Show `*` for uncommitted changes |
 | `gitStatus.showAheadBehind` | boolean | false | Show `↑N ↓N` for ahead/behind remote |
@@ -197,7 +199,7 @@ Chinese HUD labels are available as an explicit opt-in. English stays the defaul
 | `display.showAddedDirs` | boolean | true | Show extra workspace directories from `/add-dir` (e.g. `+sparkle +lib-foo`); empty array renders nothing. In both layouts at most 5 dirs render (overflow shown as `+N more`) and basenames are truncated to 24 chars with `…` |
 | `display.addedDirsLayout` | `inline` \| `line` | `inline` | `inline` puts dirs next to the project name with a `+name` prefix per dir; `line` renders them on a separate `Added dirs: name1, name2` line (no `+` prefix, comma-separated) |
 | `display.showContextBar` | boolean | true | Show visual context bar `████░░░░░░` |
-| `display.contextValue` | `percent` \| `tokens` \| `remaining` \| `both` | `percent` | Context display format (`45%`, `45k/200k`, `55%` remaining, or `45% (45k/200k)`) |
+| `display.contextValue` | `percent` \| `tokens` \| `remaining` \| `both` | `both` | Context display format (`45%`, `45k/200k`, `55%` remaining, or `45% (45k/200k)`) |
 | `display.showConfigCounts` | boolean | false | Show CLAUDE.md, rules, MCPs, hooks counts |
 | `display.showCost` | boolean | false | Show session cost using Claude Code's native `cost.total_cost_usd` when available, with a local estimate fallback for direct Anthropic sessions |
 | `display.showOutputStyle` | boolean | false | Show the active Claude Code `outputStyle` from settings files as `style: <name>` |
@@ -217,10 +219,11 @@ Chinese HUD labels are available as an explicit opt-in. English stays the defaul
 | `display.showAgents` | boolean | false | Show agents activity line |
 | `display.showTodos` | boolean | false | Show todos progress line |
 | `display.showSessionName` | boolean | false | Show session slug or custom title from `/rename` |
+| `display.showSessionTokens` | boolean | true | Show cumulative session tokens; the default third row uses this component |
 | `display.showSessionStartDate` | boolean | false | Show the transcript session start timestamp |
 | `display.showLastResponseAt` | boolean | false | Show how long ago the last assistant response was written |
 | `display.showClaudeCodeVersion` | boolean | false | Show the installed Claude Code version, e.g. `CC v2.1.81` |
-| `display.showMemoryUsage` | boolean | false | Show an approximate system RAM usage line in expanded layout |
+| `display.showMemoryUsage` | boolean | false | Show an approximate system RAM usage row when `"memory"` is included in `rows` |
 | `display.showPromptCache` | boolean | false | Show a prompt cache countdown based on the last assistant response timestamp in the transcript |
 | `display.promptCacheTtlSeconds` | number | `300` | Prompt cache TTL in seconds. Keep the default for Pro, set `3600` for Max |
 | `colors.context` | color value | `green` | Base color for the context bar and context percentage |
@@ -241,7 +244,7 @@ Chinese HUD labels are available as an explicit opt-in. English stays the defaul
 
 Supported color names: `dim`, `red`, `green`, `yellow`, `magenta`, `cyan`, `brightBlue`, `brightMagenta`. You can also use a 256-color number (`0-255`) or hex (`#rrggbb`).
 
-`display.showMemoryUsage` is fully opt-in and only renders in `expanded` layout. It reports approximate system RAM usage from the local machine, not precise memory pressure inside Claude Code or a specific process. The number may overstate actual pressure because reclaimable OS cache and buffers can still be counted as used memory.
+`display.showMemoryUsage` is fully opt-in; add `"memory"` to `rows` to render it. It reports approximate system RAM usage from the local machine, not precise memory pressure inside Claude Code or a specific process. The number may overstate actual pressure because reclaimable OS cache and buffers can still be counted as used memory.
 
 `display.showCost` is fully opt-in. ClaudeHUD prefers the native `cost.total_cost_usd` field that Claude Code provides on stdin when it is available. If that field is absent or invalid for a direct Anthropic session, ClaudeHUD falls back to the existing local transcript-based estimate so the cost line still works on older payloads. The native field is absent before the first API response in a session, so the cost display may stay hidden until then. ClaudeHUD also keeps the cost hidden for known routed providers such as Bedrock and Vertex AI, because cloud-provider billed sessions may report `$0.00` or omit the field even though the session was not literally free.
 
@@ -249,7 +252,7 @@ Supported color names: `dim`, `red`, `green`, `yellow`, `magenta`, `cyan`, `brig
 
 ### Usage Limits
 
-Usage display is **enabled by default** when Claude Code provides subscriber `rate_limits` data on stdin. It shows your rate limit consumption on line 2 alongside the context bar.
+Usage data is available by default when Claude Code provides subscriber `rate_limits` data on stdin. To render it, include `"usage"` in `rows`, for example as its own row or beside the context components.
 
 Set `display.usageValue` to `remaining` to show quota left instead of quota used. Warning colors and 7-day threshold checks still use the underlying used percentage.
 
@@ -311,9 +314,16 @@ Example fallback snapshot:
 ```json
 {
   "language": "zh",
-  "lineLayout": "expanded",
+  "rows": [
+    ["model", "contextBar", "contextValue"],
+    ["project", "addedDirs", "git"],
+    ["sessionTokens"],
+    ["tools"],
+    ["agents"],
+    ["todos"]
+  ],
+  "rowOverflow": "truncate",
   "pathLevels": 2,
-  "elementOrder": ["project", "tools", "context", "usage", "memory", "environment", "agents", "todos", "sessionTime"],
   "gitStatus": {
     "enabled": true,
     "showDirty": true,
@@ -364,7 +374,7 @@ Example fallback snapshot:
 
 **Config not applying?**
 - Check for JSON syntax errors: invalid JSON silently falls back to defaults
-- Ensure valid values: `pathLevels` must be 1, 2, or 3; `lineLayout` must be `expanded` or `compact`; `maxWidth` must be a positive number
+- Ensure valid values: `pathLevels` must be 1, 2, or 3; `rowOverflow` must be `truncate` or `wrap`; `maxWidth` must be a positive number
 - Delete config and run `/claude-hud-plus:configure` to regenerate
 
 **Git status missing?**

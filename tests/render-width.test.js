@@ -303,6 +303,46 @@ test('render uses maxWidth over a detected 80-column width when forceMaxWidth is
   assert.ok(!lines[0].includes('...'), 'should avoid ellipsis truncation');
 });
 
+test('render rows layout uses detected terminal width for truncation', () => {
+  const ctx = baseContext();
+  ctx.config = mergeConfig({
+    rows: [['project', 'git']],
+    rowOverflow: 'truncate',
+  });
+  ctx.stdin.cwd = '/tmp/very-long-project-name-for-custom-rows-width';
+  ctx.gitStatus = { branch: 'feature/very-long-branch-name', isDirty: true, ahead: 0, behind: 0 };
+
+  let lines = [];
+  withTerminal(25, () => {
+    lines = captureRender(ctx);
+  });
+
+  assert.equal(lines.length, 1);
+  assert.ok(lines.every(line => displayWidth(line) <= 25), 'rows layout should fit detected terminal width');
+  assert.ok(lines[0].includes('...'), `expected truncated row, got: ${lines[0]}`);
+});
+
+test('render rows layout uses forced maxWidth over detected width', () => {
+  const ctx = baseContext();
+  ctx.config = mergeConfig({
+    rows: [['project', 'git']],
+    rowOverflow: 'truncate',
+    maxWidth: 20,
+    forceMaxWidth: true,
+  });
+  ctx.stdin.cwd = '/tmp/very-long-project-name-for-forced-custom-rows-width';
+  ctx.gitStatus = { branch: 'feature/very-long-branch-name', isDirty: true, ahead: 0, behind: 0 };
+
+  let lines = [];
+  withTerminal(80, () => {
+    lines = captureRender(ctx);
+  });
+
+  assert.equal(lines.length, 1);
+  assert.ok(lines.every(line => displayWidth(line) <= 20), 'rows layout should fit forced maxWidth');
+  assert.ok(lines[0].includes('...'), `expected truncated row, got: ${lines[0]}`);
+});
+
 test('render ignores OSC 8 hyperlink sequences when measuring line width', () => {
   const ctx = baseContext();
   ctx.config.lineLayout = 'compact';

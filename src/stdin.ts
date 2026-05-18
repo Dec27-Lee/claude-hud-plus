@@ -275,11 +275,6 @@ export function getProviderLabel(stdin: StdinData): string | null {
     return 'Enterprise';
   }
 
-  const routerInfo = getRouterModelInfo(stdin);
-  if (routerInfo) {
-    return routerInfo.provider ?? 'CCR';
-  }
-
   return null;
 }
 

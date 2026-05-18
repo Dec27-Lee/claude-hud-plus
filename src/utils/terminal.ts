@@ -1,8 +1,13 @@
 export const UNKNOWN_TERMINAL_WIDTH = null;
 
+function parsePositiveInteger(value: string | undefined): number | null {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 function parseEnvColumns(): number | null {
-  const envColumns = Number.parseInt(process.env.COLUMNS ?? '', 10);
-  return Number.isFinite(envColumns) && envColumns > 0 ? envColumns : null;
+  return parsePositiveInteger(process.env.CLAUDE_HUD_TERMINAL_WIDTH)
+    ?? parsePositiveInteger(process.env.COLUMNS);
 }
 
 function parseStreamColumns(columns: unknown): number | null {

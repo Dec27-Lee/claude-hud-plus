@@ -119,6 +119,8 @@ test('getModelName prefers session router model state', () => {
   const sessionDir = path.join(root, sessionId);
 
   try {
+    useHome(root);
+    writeCcrConfig(root, { host: '127.0.0.1', port: 3456 });
     fs.writeFileSync(transcriptPath, '{}\n');
     fs.mkdirSync(sessionDir, { recursive: true });
     fs.writeFileSync(path.join(sessionDir, 'ccr-model.json'), JSON.stringify({
@@ -126,40 +128,50 @@ test('getModelName prefers session router model state', () => {
       provider: 'openrouter',
       requestedModel: 'claude-sonnet-4-6',
     }));
-    process.env.CLAUDE_HUD_ROUTER_MODEL = '1';
+    process.env.ANTHROPIC_BASE_URL = 'http://localhost:3456/v1/messages';
 
     const stdin = { transcript_path: transcriptPath, model: { display_name: 'Claude Sonnet 4.6' } };
     assert.equal(getModelName(stdin), 'openrouter/claude-sonnet-4.6');
-    assert.equal(getProviderLabel(stdin), 'openrouter');
+    assert.equal(getProviderLabel(stdin), null);
   } finally {
     restoreRouterEnv(env);
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('getModelName falls back to latest router model state', () => {
+test('getModelName falls back to Claude Code stdin model without session router state', () => {
   const env = snapshotRouterEnv();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-hud-router-'));
-  const statePath = path.join(root, 'latest-model.json');
 
   try {
-    fs.writeFileSync(statePath, JSON.stringify({ model: 'gemini-2.5-pro', provider: 'gemini' }));
-    process.env.CLAUDE_HUD_ROUTER_MODEL = '1';
-    process.env.CLAUDE_HUD_ROUTER_MODEL_STATE_PATH = statePath;
+    useHome(root);
+    writeCcrConfig(root, { host: '127.0.0.1', port: 3456 });
+    process.env.ANTHROPIC_BASE_URL = 'http://127.0.0.1:3456';
 
     const stdin = { model: { display_name: 'Claude Opus 4.7' } };
-    assert.equal(getModelName(stdin), 'gemini-2.5-pro');
-    assert.equal(getProviderLabel(stdin), 'gemini');
+    assert.equal(getModelName(stdin), 'Claude Opus 4.7');
+    assert.equal(getProviderLabel(stdin), null);
   } finally {
     restoreRouterEnv(env);
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+function writeCcrConfig(root, { host, port }) {
+  const ccrDir = path.join(root, '.claude-code-router');
+  fs.mkdirSync(ccrDir, { recursive: true });
+  fs.writeFileSync(path.join(ccrDir, 'config.json'), JSON.stringify({ HOST: host, PORT: port }));
+}
+
+function useHome(root) {
+  process.env.HOME = root;
+  process.env.USERPROFILE = root;
+}
 
 function snapshotRouterEnv() {
   return {
-    CLAUDE_HUD_ROUTER_MODEL: process.env.CLAUDE_HUD_ROUTER_MODEL,
-    CLAUDE_HUD_ROUTER_MODEL_STATE_PATH: process.env.CLAUDE_HUD_ROUTER_MODEL_STATE_PATH,
+    HOME: process.env.HOME,
+    USERPROFILE: process.env.USERPROFILE,
     CLAUDE_HUD_ROUTER_MODEL_MAX_AGE_MS: process.env.CLAUDE_HUD_ROUTER_MODEL_MAX_AGE_MS,
     ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
     ANTHROPIC_API_BASE_URL: process.env.ANTHROPIC_API_BASE_URL,
@@ -180,7 +192,6 @@ test('getProviderLabel returns Bedrock when CLAUDE_CODE_USE_BEDROCK=1', () => {
   const routerEnv = snapshotRouterEnv();
   try {
     process.env.CLAUDE_CODE_USE_BEDROCK = '1';
-    process.env.CLAUDE_HUD_ROUTER_MODEL = '0';
     const result = getProviderLabel({ model: { id: 'claude-sonnet-4-6' } });
     assert.equal(result, 'Bedrock');
   } finally {
@@ -195,7 +206,6 @@ test('getProviderLabel returns null when CLAUDE_CODE_USE_BEDROCK is not set', ()
   const routerEnv = snapshotRouterEnv();
   try {
     delete process.env.CLAUDE_CODE_USE_BEDROCK;
-    process.env.CLAUDE_HUD_ROUTER_MODEL = '0';
     const result = getProviderLabel({ model: { id: 'anthropic.claude-sonnet-4-6' } });
     assert.equal(result, null);
   } finally {
@@ -210,7 +220,6 @@ test('getProviderLabel returns null for cross-region model ID without env var', 
   const routerEnv = snapshotRouterEnv();
   try {
     delete process.env.CLAUDE_CODE_USE_BEDROCK;
-    process.env.CLAUDE_HUD_ROUTER_MODEL = '0';
     const result = getProviderLabel({ model: { id: 'us.anthropic.claude-sonnet-4-6' } });
     assert.equal(result, null);
   } finally {
@@ -225,7 +234,6 @@ test('getProviderLabel returns null when CLAUDE_CODE_USE_BEDROCK=0', () => {
   const routerEnv = snapshotRouterEnv();
   try {
     process.env.CLAUDE_CODE_USE_BEDROCK = '0';
-    process.env.CLAUDE_HUD_ROUTER_MODEL = '0';
     const result = getProviderLabel({ model: { id: 'anthropic.claude-sonnet-4-6' } });
     assert.equal(result, null);
   } finally {

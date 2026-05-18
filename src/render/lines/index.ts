@@ -1,5 +1,5 @@
-export { renderIdentityLine } from './identity.js';
-export { renderProjectLine, renderGitFilesLine } from './project.js';
+export { renderIdentityLine, renderContextBarPart, renderContextValuePart, formatContextValue, formatTokens } from './identity.js';
+export { renderProjectLine, renderGitFilesLine, renderModelPart, renderProjectPart, renderAddedDirsPart, renderGitPart } from './project.js';
 export { renderAddedDirsLine } from './added-dirs.js';
 export { renderEnvironmentLine } from './environment.js';
 export { renderPromptCacheLine, formatPromptCacheCountdown } from './prompt-cache.js';
