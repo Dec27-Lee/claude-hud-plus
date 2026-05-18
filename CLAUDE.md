@@ -59,5 +59,3 @@ research/            本地调研资料、历史验证脚本和对话材料
 ## 上游同步
 
 本仓库应先完整同步官方 `claude-hud` 最新代码作为基线，再叠加 Plus 修改。不要按文件零散挑选上游代码落库。
-
-上游归档说明位于 `docs/upstream/CLAUDE.README.md`。

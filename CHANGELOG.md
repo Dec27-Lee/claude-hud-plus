@@ -10,9 +10,14 @@
 - 增加 Windows PowerShell 5.1 写入 `settings.json` 时避免 UTF-8 BOM 的说明。
 - 中文化用户可见的命令提示词、插件元数据、治理文档和 GitHub 模板。
 
+### 已变更
+
+- 移除 `docs/upstream/CLAUDE.README.md` 上游说明归档，避免和 Plus 当前用户文档混淆；上游同步原则保留在 `CLAUDE.md`。
+- 同步更新 README、slash command 说明和安装后配置示例，使文档以当前 `rows` 布局、动态终端宽度和会话级 CCR 模型状态为准。
+
 ### 已新增
 
-- 新增 `rows` / `rowOverflow` 行布局配置，默认渲染模型+上下文、项目+Git、会话 Token 三行 HUD。
+- 新增 `rows` / `rowOverflow` 行布局配置，默认渲染模型+上下文、项目/额外工作目录+Git、会话 Token 三行 HUD。
 - Plus 路由模型读取：自动对比 Claude Code 当前请求地址与 CCR 配置 `HOST` / `PORT`，确认匹配后读取当前会话级 `ccr-model.json`；状态文件缺失时模型组件显示运行 setup 的中英文提示。
 - Plus 上下文窗口覆盖：支持通过 `CLAUDE_HUD_CONTEXT_WINDOW_SIZE` 覆盖展示用上下文窗口大小并重算百分比。
 - `scripts/patch-ccr-session-model.cjs`，用于在 setup 用户确认后备份并修补 CCR，使其写入会话级真实模型状态。
@@ -28,7 +33,7 @@
 
 ## 上游历史
 
-以下条目来自官方 Claude HUD 上游历史，用于保留来源和演进背景。
+以下条目来自官方 Claude HUD 上游历史，用于保留来源和演进背景。这里可能出现 `lineLayout` 等上游旧配置名；它们不是 Claude HUD Plus 当前推荐配置，当前 Plus 布局以 `rows` / `rowOverflow` 为准。
 
 ## [0.0.12] - 2026-04-04
 

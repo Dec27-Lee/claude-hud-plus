@@ -111,7 +111,7 @@ my-project git:(main*)
 Tokens 145.2M (in: 11.4M, out: 378k, cache: 133.4M)
 ```
 - **Line 1** — Model, context bar, and context value
-- **Line 2** — Project path and git branch
+- **Line 2** — Project path, added workspace directories, and git branch (when no `/add-dir` entries exist, only project + Git are shown)
 - **Line 3** — Cumulative session tokens
 
 The layout is defined by `rows` in `config.json`, so you can choose how many lines to render and which components appear on each line. Claude Code's native permission-mode prompt, such as bypass permissions, is not rendered by the HUD.
@@ -130,7 +130,7 @@ The layout is defined by `rows` in `config.json`, so you can choose how many lin
 Claude HUD uses Claude Code's native **statusline API** — no separate window, no tmux required, works in any terminal.
 
 ```
-Claude Code → stdin JSON → claude-hud → stdout → displayed in your terminal
+Claude Code → stdin JSON → claude-hud-plus → stdout → displayed in your terminal
            ↘ transcript JSONL (tools, agents, todos)
 ```
 
@@ -181,7 +181,7 @@ Chinese HUD labels are available as an explicit opt-in. English stays the defaul
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `language` | `en` \| `zh` | `en` | HUD label language. English is the default; set `zh` to enable Chinese labels. |
-| `rows` | string[][] | `[["model","contextBar","contextValue"],["project","git"],["sessionTokens"]]` | HUD row layout. The outer array defines lines; each inner array defines components on that line. |
+| `rows` | string[][] | `[["model","contextBar","contextValue"],["project","addedDirs","git"],["sessionTokens"]]` | HUD row layout. The outer array defines lines; each inner array defines components on that line. |
 | `rowOverflow` | `truncate` \| `wrap` | `truncate` | Truncate overlong rows, or wrap at supported separator boundaries. |
 | `pathLevels` | 1-3 | 1 | Directory levels to show in project path |
 | `maxWidth` | number \| `null` | `null` | Optional fallback width used only when terminal width detection fails completely |
@@ -354,19 +354,21 @@ Example fallback snapshot:
 }
 ```
 
-### Display Examples
+### Project/Git Display Examples
 
-**1 level (default):** `[Opus] │ my-project git:(main)`
+These examples show the project and Git fragment from the default second row. Model and context render on the first row by default.
 
-**2 levels:** `[Opus] │ apps/my-project git:(main)`
+**1 level (default):** `my-project git:(main)`
 
-**3 levels:** `[Opus] │ dev/apps/my-project git:(main)`
+**2 levels:** `apps/my-project git:(main)`
 
-**With dirty indicator:** `[Opus] │ my-project git:(main*)`
+**3 levels:** `dev/apps/my-project git:(main)`
 
-**With ahead/behind:** `[Opus] │ my-project git:(main ↑2 ↓1)`
+**With dirty indicator:** `my-project git:(main*)`
 
-**With file stats:** `[Opus] │ my-project git:(main* !3 +1 ?2)`
+**With ahead/behind:** `my-project git:(main ↑2 ↓1)`
+
+**With file stats:** `my-project git:(main* !3 +1 ?2)`
 - `!` = modified files, `+` = added/staged, `✘` = deleted, `?` = untracked
 - Counts of 0 are omitted for cleaner display
 

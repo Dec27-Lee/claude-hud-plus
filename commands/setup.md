@@ -196,7 +196,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{WRAPPER_PATH}"
 询问：
 
 - header: `功能`
-- question: `是否启用一些可选 HUD 功能？默认只显示核心信息。`
+- question: `是否启用一些可选 HUD 功能？默认显示模型、上下文、项目/Git 和会话 Token 三行核心信息。`
 - multiSelect: true
 - options:
   - `工具活动` — 显示 Read/Edit/Grep 等工具运行状态
@@ -206,11 +206,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{WRAPPER_PATH}"
 
 如果用户选择了任何选项，写入 `~/.claude/plugins/claude-hud-plus/config.json`。
 
-配置示例：
+配置示例，保留当前默认三行布局，只开启用户选择的可选项：
 
 ```json
 {
   "language": "zh",
+  "rows": [
+    ["model", "contextBar", "contextValue"],
+    ["project", "addedDirs", "git"],
+    ["sessionTokens"]
+  ],
+  "rowOverflow": "truncate",
   "display": {
     "showTools": true,
     "showAgents": true,

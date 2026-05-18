@@ -110,7 +110,7 @@ my-project git:(main*)
 Tokens 145.2M (in: 11.4M, out: 378k, cache: 133.4M)
 ```
 - **第 1 行** — 模型、上下文进度条和上下文数值
-- **第 2 行** — 项目路径和 git 分支
+- **第 2 行** — 项目路径、额外工作目录和 git 分支（未使用 `/add-dir` 时只显示项目与 Git）
 - **第 3 行** — 当前会话累计 Token
 
 布局由 `config.json` 中的 `rows` 定义，想显示几行、每行包含哪些组件都可以调整。Claude Code 原生的权限模式提示（如 bypass permissions）不属于 HUD 输出，不需要在这里配置。
@@ -176,7 +176,7 @@ Claude Code → stdin JSON → claude-hud-plus → stdout → 在终端中显示
 | 选项 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `language` | `en` \| `zh` | `en` | HUD 标签语言。默认为英文；设为 `zh` 启用中文标签 |
-| `rows` | string[][] | `[["model","contextBar","contextValue"],["project","git"],["sessionTokens"]]` | HUD 行布局；外层数组定义行，内层数组定义该行显示的组件 |
+| `rows` | string[][] | `[["model","contextBar","contextValue"],["project","addedDirs","git"],["sessionTokens"]]` | HUD 行布局；外层数组定义行，内层数组定义该行显示的组件 |
 | `rowOverflow` | `truncate` \| `wrap` | `truncate` | 行超出终端宽度时截断，或在可分隔处换行 |
 | `pathLevels` | 1-3 | 1 | 项目路径显示的目录层级数 |
 | `maxWidth` | number \| null | null | 终端宽度探测失败时的兜底宽度；默认不设置，优先动态读取实际终端宽度 |
@@ -191,6 +191,8 @@ Claude Code → stdin JSON → claude-hud-plus → stdout → 在终端中显示
 | `gitStatus.showFileStats` | boolean | false | 显示文件变更数量 `!M +A ✘D ?U` |
 | `gitStatus.branchOverflow` | `truncate` \| `wrap` | `truncate` | 保持当前截断行为，或在可能时让 git 块以自己的换行边界单独换到下一行 |
 | `display.showModel` | boolean | true | 显示模型名称 `[Opus]` |
+| `display.showAddedDirs` | boolean | true | 显示 `/add-dir` 添加的额外工作目录，例如 `+sparkle +lib-foo`；没有额外目录时不输出 |
+| `display.addedDirsLayout` | `inline` \| `line` | `inline` | `inline` 会把额外目录放在项目名旁边；`line` 会渲染为独立的 `Added dirs: name1, name2` 行 |
 | `display.showContextBar` | boolean | true | 显示可视化上下文进度条 `████░░░░░░` |
 | `display.contextValue` | `percent` \| `tokens` \| `remaining` \| `both` | `both` | 上下文显示格式（`45%`、`45k/200k`、剩余 `55%` 或 `45% (45k/200k)`） |
 | `display.showConfigCounts` | boolean | false | 显示 CLAUDE.md、rules、MCPs、hooks 数量 |
@@ -199,7 +201,10 @@ Claude Code → stdin JSON → claude-hud-plus → stdout → 在终端中显示
 | `display.showDuration` | boolean | false | 显示会话时长 `⏱️ 5m` |
 | `display.showSpeed` | boolean | false | 显示输出 Token 速度 `out: 42.1 tok/s` |
 | `display.showUsage` | boolean | true | 显示 Claude 订阅用户的使用率限制（可用时） |
+| `display.usageValue` | `percent` \| `remaining` | `percent` | 使用率显示格式：显示已用百分比，或显示剩余额度 |
 | `display.usageBarEnabled` | boolean | true | 将使用率显示为可视化进度条而非文本 |
+| `display.usageCompact` | boolean | false | 使用更短的文本形式显示使用率，例如 `5h: 25% (1h 30m)`；优先级高于 `display.usageBarEnabled` |
+| `display.showResetLabel` | boolean | true | 显示使用率倒计时前缀，例如中文 `后重置` 或英文 `resets in` |
 | `display.timeFormat` | `relative` \| `absolute` \| `both` | `relative` | 控制使用率重置时间的显示方式：仅倒计时（如 `2小时30分后重置`）、显示墙钟时间（如 `14:30 重置`），或同时显示两者 |
 | `display.sevenDayThreshold` | 0-100 | 80 | 当 7 天使用率 ≥ 阈值时显示（0 = 始终显示） |
 | `display.externalUsagePath` | string | `""` | 可选的本地使用率快照文件路径，仅在 stdin `rate_limits` 缺失时使用 |
@@ -210,6 +215,8 @@ Claude Code → stdin JSON → claude-hud-plus → stdout → 在终端中显示
 | `display.showTodos` | boolean | false | 显示待办进度行 |
 | `display.showSessionName` | boolean | false | 显示会话 slug 或 `/rename` 设置的自定义标题 |
 | `display.showSessionTokens` | boolean | true | 显示当前会话累计 Token；默认 rows 的第三行使用它 |
+| `display.showSessionStartDate` | boolean | false | 显示 transcript 会话开始时间 |
+| `display.showLastResponseAt` | boolean | false | 显示距最后一次 assistant 响应过去了多久 |
 | `display.showClaudeCodeVersion` | boolean | false | 显示已安装的 Claude Code 版本，如 `CC v2.1.81` |
 | `display.showMemoryUsage` | boolean | false | 当 `rows` 中包含 `"memory"` 时显示近似系统 RAM 使用行 |
 | `display.showPromptCache` | boolean | false | 根据 transcript 中最后一次 assistant 响应时间显示提示缓存倒计时 |
@@ -225,6 +232,10 @@ Claude Code → stdin JSON → claude-hud-plus → stdout → 在终端中显示
 | `colors.gitBranch` | 颜色值 | `cyan` | Git 分支和分支状态文本的颜色 |
 | `colors.label` | 颜色值 | `dim` | 标签和次要元数据的颜色，如 `上下文`、`使用率`、计数和进度文本 |
 | `colors.custom` | 颜色值 | `208` | 可选自定义行的颜色 |
+| `colors.barFilled` | string | `█` | 进度条已填充部分使用的字符 |
+| `colors.barEmpty` | string | `░` | 进度条空白部分使用的字符 |
+
+`colors.barFilled` 和 `colors.barEmpty` 只接受单个可见字素。控制字符、不可见格式字符、换行分隔符和非字符会被拒绝。宽字符（emoji、CJK）在不同终端中可能影响对齐。
 
 支持的颜色名称：`dim`、`red`、`green`、`yellow`、`magenta`、`cyan`、`brightBlue`、`brightMagenta`。你也可以使用 256 色数字（`0-255`）或十六进制（`#rrggbb`）。
 
@@ -237,6 +248,8 @@ Claude Code → stdin JSON → claude-hud-plus → stdout → 在终端中显示
 ### 使用率限制
 
 当 Claude Code 在 stdin 上提供订阅用户 `rate_limits` 数据时，使用率组件默认可用。若要显示它，请在 `rows` 中加入 `"usage"`，例如追加 `["usage"]` 或把它放到上下文行。
+
+将 `display.usageValue` 设为 `remaining` 可显示剩余额度，而不是已用百分比。警告颜色和 7 天阈值判断仍使用底层已用百分比。
 
 ClaudeHUD 优先使用官方状态栏 stdin 负载中的使用率数据。如果 `rate_limits` 缺失，你可以通过 `display.externalUsagePath` 显式启用本地旁路快照回退，例如让代理程序写入 JSON 文件。只要 stdin 和本地旁路快照同时存在，stdin 始终优先。
 
@@ -253,6 +266,10 @@ ClaudeHUD 优先使用官方状态栏 stdin 负载中的使用率数据。如果
 如需禁用，请将 `display.showUsage` 设为 `false`。
 
 重置时间默认显示为相对倒计时。将 `display.timeFormat` 设为 `absolute` 可显示墙钟时间，设为 `both` 可同时显示两种形式。该设置目前只能手动编辑；`/claude-hud-plus:configure` 会保留它，但不会修改它。
+
+如果想缩短倒计时，可将 `display.showResetLabel` 设为 `false`，例如显示 `(3h 17m)` 而不是 `(3小时17分后重置)`。
+
+如果想使用更短的使用率文本，可将 `display.usageCompact` 设为 `true`，例如 `5h: 25% (1h 30m)`。紧凑使用率优先级高于 `display.usageBarEnabled`。
 
 **前提条件：**
 - Claude Code 必须在当前会话的 stdin 上包含订阅用户 `rate_limits` 数据
@@ -330,19 +347,21 @@ ClaudeHUD 优先使用官方状态栏 stdin 负载中的使用率数据。如果
 }
 ```
 
-### 显示示例
+### 项目/Git 显示示例
 
-**1 级（默认）：** `[Opus] │ my-project git:(main)`
+这些示例展示默认第二行中的项目与 Git 片段；模型和上下文默认在第一行显示。
 
-**2 级：** `[Opus] │ apps/my-project git:(main)`
+**1 级（默认）：** `my-project git:(main)`
 
-**3 级：** `[Opus] │ dev/apps/my-project git:(main)`
+**2 级：** `apps/my-project git:(main)`
 
-**带脏状态指示器：** `[Opus] │ my-project git:(main*)`
+**3 级：** `dev/apps/my-project git:(main)`
 
-**带领先/落后：** `[Opus] │ my-project git:(main ↑2 ↓1)`
+**带脏状态指示器：** `my-project git:(main*)`
 
-**带文件统计：** `[Opus] │ my-project git:(main* !3 +1 ?2)`
+**带领先/落后：** `my-project git:(main ↑2 ↓1)`
+
+**带文件统计：** `my-project git:(main* !3 +1 ?2)`
 - `!` = 修改的文件，`+` = 新增/暂存，`✘` = 删除，`?` = 未跟踪
 - 计数为 0 的项会被省略，以保持显示整洁
 
