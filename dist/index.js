@@ -74,7 +74,7 @@ export async function main(overrides = {}) {
         const effortInfo = config.display.showEffortLevel
             ? resolveEffortLevel(stdin.effort)
             : null;
-        const memoryUsage = config.display.showMemoryUsage && config.lineLayout === "expanded"
+        const memoryUsage = config.display.showMemoryUsage
             ? await deps.getMemoryUsage()
             : null;
         const ctx = {

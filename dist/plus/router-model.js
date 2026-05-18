@@ -6,19 +6,21 @@ const DEFAULT_STATE_MAX_AGE_MS = 120000;
 let routerModelCache = null;
 let transcriptSessionCache = null;
 export function getRouterModelInfo(stdin) {
-    if (!isRouterModelEnabled()) {
-        return null;
+    const status = getRouterModelStatus(stdin);
+    return status.kind === 'ready' ? status.info : null;
+}
+export function getRouterModelStatus(stdin) {
+    if (!isCurrentClaudeCodeUsingCcr()) {
+        return { kind: 'not-ccr' };
     }
     const now = Date.now();
     const transcriptPath = stdin.transcript_path;
     const sessionId = getSessionIdFromTranscriptPath(transcriptPath);
     if (sessionId && typeof transcriptPath === 'string' && transcriptPath.trim()) {
-        const sessionModel = readRouterModelState(getClaudeSessionModelPath(transcriptPath, sessionId), now, 'session');
-        if (sessionModel) {
-            return sessionModel;
-        }
+        const info = readRouterModelState(getClaudeSessionModelPath(transcriptPath, sessionId), now, 'session');
+        return info ? { kind: 'ready', info } : { kind: 'missing-session-state' };
     }
-    return readRouterModelState(getLatestModelPath(), now, 'latest');
+    return { kind: 'missing-session-state' };
 }
 function readRouterModelState(statePath, now, source) {
     if (routerModelCache && routerModelCache.statePath === statePath && routerModelCache.expiresAt > now) {
@@ -113,33 +115,80 @@ function getSessionIdFromTranscriptPath(transcriptPath) {
 function getClaudeSessionModelPath(transcriptPath, sessionId) {
     return path.join(path.dirname(transcriptPath), sessionId, 'ccr-model.json');
 }
-function getLatestModelPath() {
-    return process.env.CLAUDE_HUD_ROUTER_MODEL_STATE_PATH?.trim()
-        || path.join(os.homedir(), '.claude-code-router', 'runtime', 'latest-model.json');
+function isCurrentClaudeCodeUsingCcr() {
+    const baseUrl = readString(process.env.ANTHROPIC_BASE_URL) ?? readString(process.env.ANTHROPIC_API_BASE_URL);
+    const claudeEndpoint = parseUrlEndpoint(baseUrl);
+    const ccrEndpoint = readCcrEndpoint();
+    return Boolean(claudeEndpoint && ccrEndpoint && endpointsMatch(claudeEndpoint, ccrEndpoint));
 }
-function isRouterModelEnabled() {
-    const mode = process.env.CLAUDE_HUD_ROUTER_MODEL?.trim().toLowerCase();
-    if (mode === '0' || mode === 'false' || mode === 'off' || mode === 'disabled') {
-        return false;
-    }
-    if (mode === '1' || mode === 'true' || mode === 'on' || mode === 'enabled') {
-        return true;
-    }
-    const baseUrl = process.env.ANTHROPIC_BASE_URL?.trim() ?? process.env.ANTHROPIC_API_BASE_URL?.trim() ?? '';
-    return isLikelyCcrBaseUrl(baseUrl);
-}
-function isLikelyCcrBaseUrl(baseUrl) {
-    if (!baseUrl) {
-        return false;
-    }
+function readCcrEndpoint() {
     try {
-        const parsed = new URL(baseUrl);
-        const isLocalHost = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost';
-        return isLocalHost && parsed.port === '3456';
+        const configPath = path.join(os.homedir(), '.claude-code-router', 'config.json');
+        const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const host = readString(parsed.HOST) ?? readString(parsed.host) ?? '127.0.0.1';
+        const port = readPort(parsed.PORT) ?? readPort(parsed.port) ?? '3456';
+        return { host: normalizeHost(host), port };
     }
     catch {
-        return false;
+        return null;
     }
+}
+function parseUrlEndpoint(value) {
+    if (!value) {
+        return null;
+    }
+    const candidates = value.includes('://') ? [value] : [`http://${value}`];
+    for (const candidate of candidates) {
+        try {
+            const parsed = new URL(candidate);
+            const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80');
+            return { host: normalizeHost(parsed.hostname), port };
+        }
+        catch { }
+    }
+    return null;
+}
+function readPort(value) {
+    if (typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 65535) {
+        return String(value);
+    }
+    if (typeof value !== 'string' || !value.trim()) {
+        return null;
+    }
+    const parsed = Number.parseInt(value.trim(), 10);
+    return Number.isInteger(parsed) && parsed > 0 && parsed <= 65535 ? String(parsed) : null;
+}
+function endpointsMatch(claudeEndpoint, ccrEndpoint) {
+    return claudeEndpoint.port === ccrEndpoint.port && hostsMatch(claudeEndpoint.host, ccrEndpoint.host);
+}
+function hostsMatch(claudeHost, ccrHost) {
+    if (claudeHost === ccrHost) {
+        return true;
+    }
+    if (isWildcardHost(ccrHost)) {
+        return isLoopbackHost(claudeHost) || isLocalInterfaceHost(claudeHost);
+    }
+    return isLoopbackHost(claudeHost) && isLoopbackHost(ccrHost);
+}
+function normalizeHost(host) {
+    return host.trim().toLowerCase().replace(/^\[|\]$/g, '');
+}
+function isLoopbackHost(host) {
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+}
+function isLocalInterfaceHost(host) {
+    const interfaces = os.networkInterfaces();
+    for (const addresses of Object.values(interfaces)) {
+        for (const address of addresses ?? []) {
+            if (normalizeHost(address.address) === host) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+function isWildcardHost(host) {
+    return host === '0.0.0.0' || host === '::' || host === '';
 }
 function getStateMaxAgeMs() {
     const value = Number.parseInt(process.env.CLAUDE_HUD_ROUTER_MODEL_MAX_AGE_MS ?? '', 10);

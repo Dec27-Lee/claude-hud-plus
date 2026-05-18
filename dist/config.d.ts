@@ -1,5 +1,4 @@
 import type { Language } from './i18n/types.js';
-export type LineLayoutType = 'compact' | 'expanded';
 export type AutocompactBufferMode = 'enabled' | 'disabled';
 export type ContextValueMode = 'percent' | 'tokens' | 'remaining' | 'both';
 export type UsageValueMode = 'percent' | 'remaining';
@@ -14,6 +13,9 @@ export type GitBranchOverflowMode = 'truncate' | 'wrap';
 export type ModelFormatMode = 'full' | 'compact' | 'short';
 export type TimeFormatMode = 'relative' | 'absolute' | 'both';
 export type HudElement = 'project' | 'addedDirs' | 'context' | 'usage' | 'promptCache' | 'memory' | 'environment' | 'tools' | 'agents' | 'todos' | 'sessionTime';
+export type HudRowItem = 'model' | 'contextBar' | 'contextValue' | 'project' | 'git' | 'addedDirs' | 'sessionTokens' | 'usage' | 'promptCache' | 'memory' | 'environment' | 'tools' | 'agents' | 'todos' | 'sessionTime' | 'customLine';
+export type HudRow = HudRowItem[];
+export type RowOverflowMode = 'truncate' | 'wrap';
 export type AddedDirsLayout = 'inline' | 'line';
 export type HudColorName = 'dim' | 'red' | 'green' | 'yellow' | 'magenta' | 'cyan' | 'brightBlue' | 'brightMagenta';
 /** A color value: named preset, 256-color index (0-255), or hex string (#rrggbb). */
@@ -35,9 +37,11 @@ export interface HudColorOverrides {
 }
 export declare const DEFAULT_ELEMENT_ORDER: HudElement[];
 export declare const DEFAULT_MERGE_GROUPS: HudElement[][];
+export declare const DEFAULT_ROWS: HudRow[];
 export interface HudConfig {
     language: Language;
-    lineLayout: LineLayoutType;
+    rows: HudRow[];
+    rowOverflow: RowOverflowMode;
     showSeparators: boolean;
     pathLevels: 1 | 2 | 3;
     maxWidth: number | null;

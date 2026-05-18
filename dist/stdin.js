@@ -220,10 +220,6 @@ export function getProviderLabel(stdin) {
     if (isEnterpriseModelId(stdin.model?.id)) {
         return 'Enterprise';
     }
-    const routerInfo = getRouterModelInfo(stdin);
-    if (routerInfo) {
-        return routerInfo.provider ?? 'CCR';
-    }
     return null;
 }
 export function shouldHideUsage(stdin) {

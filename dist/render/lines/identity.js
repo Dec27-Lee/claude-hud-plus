@@ -4,23 +4,49 @@ import { getAdaptiveBarWidth } from "../../utils/terminal.js";
 import { t } from "../../i18n/index.js";
 import { progressLabel } from "./label-align.js";
 const DEBUG = process.env.DEBUG?.includes("claude-hud") || process.env.DEBUG === "*";
-export function renderIdentityLine(ctx, alignLabels = false) {
+function getDisplayContextPercent(ctx) {
     const rawPercent = getContextPercent(ctx.stdin);
     const bufferedPercent = getBufferedPercent(ctx.stdin);
     const autocompactMode = ctx.config?.display?.autocompactBuffer ?? "enabled";
-    const percent = autocompactMode === "disabled" ? rawPercent : bufferedPercent;
-    const colors = ctx.config?.colors;
     if (DEBUG && autocompactMode === "disabled") {
         console.error(`[claude-hud:context] autocompactBuffer=disabled, showing raw ${rawPercent}% (buffered would be ${bufferedPercent}%)`);
     }
+    return autocompactMode === "disabled" ? rawPercent : bufferedPercent;
+}
+export function renderContextBarPart(ctx) {
     const display = ctx.config?.display;
+    if (display?.showContextBar === false) {
+        return null;
+    }
+    const percent = getDisplayContextPercent(ctx);
+    const colors = ctx.config?.colors;
+    const contextThresholds = {
+        warning: display?.contextWarningThreshold,
+        critical: display?.contextCriticalThreshold,
+    };
+    return coloredBar(percent, getAdaptiveBarWidth(), colors, contextThresholds);
+}
+export function renderContextValuePart(ctx) {
+    const percent = getDisplayContextPercent(ctx);
+    const display = ctx.config?.display;
+    const colors = ctx.config?.colors;
     const contextThresholds = {
         warning: display?.contextWarningThreshold,
         critical: display?.contextCriticalThreshold,
     };
     const contextValueMode = display?.contextValue ?? "percent";
     const contextValue = formatContextValue(ctx, percent, contextValueMode);
-    const contextValueDisplay = `${getContextColor(percent, colors, contextThresholds)}${contextValue}${RESET}`;
+    return `${getContextColor(percent, colors, contextThresholds)}${contextValue}${RESET}`;
+}
+export function renderIdentityLine(ctx, alignLabels = false) {
+    const percent = getDisplayContextPercent(ctx);
+    const colors = ctx.config?.colors;
+    const display = ctx.config?.display;
+    const contextThresholds = {
+        warning: display?.contextWarningThreshold,
+        critical: display?.contextCriticalThreshold,
+    };
+    const contextValueDisplay = renderContextValuePart(ctx);
     let line = display?.showContextBar !== false
         ? `${progressLabel("label.context", colors, alignLabels)} ${coloredBar(percent, getAdaptiveBarWidth(), colors, contextThresholds)} ${contextValueDisplay}`
         : `${progressLabel("label.context", colors, alignLabels)} ${contextValueDisplay}`;
@@ -35,7 +61,7 @@ export function renderIdentityLine(ctx, alignLabels = false) {
     }
     return line;
 }
-function formatTokens(n) {
+export function formatTokens(n) {
     if (n >= 1000000) {
         return `${(n / 1000000).toFixed(1)}M`;
     }
@@ -44,7 +70,7 @@ function formatTokens(n) {
     }
     return n.toString();
 }
-function formatContextValue(ctx, percent, mode) {
+export function formatContextValue(ctx, percent, mode) {
     const totalTokens = getTotalTokens(ctx.stdin);
     const size = ctx.stdin.context_window?.context_window_size ?? 0;
     if (mode === "tokens") {

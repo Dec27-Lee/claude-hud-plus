@@ -1,5 +1,6 @@
 import { DEFAULT_ELEMENT_ORDER, DEFAULT_MERGE_GROUPS } from '../config.js';
 import { renderSessionLine } from './session-line.js';
+import { renderRowItem } from './row-items.js';
 import { renderToolsLine } from './tools-line.js';
 import { renderAgentsLine } from './agents-line.js';
 import { renderTodosLine } from './todos-line.js';
@@ -388,19 +389,20 @@ function renderExpanded(ctx, terminalWidth = null) {
     }
     return lines;
 }
-export function render(ctx) {
-    const lineLayout = ctx.config?.lineLayout ?? 'expanded';
+function renderRows(ctx) {
+    return ctx.config.rows
+        .map(row => row
+        .map(item => renderRowItem(ctx, item))
+        .filter((part) => typeof part === 'string' && part.length > 0)
+        .join(' '))
+        .filter(line => line.length > 0);
+}
+function renderLegacyLines(ctx, terminalWidth) {
+    const legacyLineLayout = ctx.config.lineLayout ?? 'compact';
     const showSeparators = ctx.config?.showSeparators ?? false;
-    const detectedWidth = getTerminalWidth({ preferEnv: true, fallback: UNKNOWN_TERMINAL_WIDTH });
-    const configuredMaxWidth = ctx.config?.maxWidth ?? UNKNOWN_TERMINAL_WIDTH;
-    const terminalWidth = ctx.config?.forceMaxWidth && configuredMaxWidth !== UNKNOWN_TERMINAL_WIDTH
-        ? configuredMaxWidth
-        : (detectedWidth ?? configuredMaxWidth ?? UNKNOWN_TERMINAL_WIDTH);
-    let lines;
-    if (lineLayout === 'expanded') {
+    if (legacyLineLayout === 'expanded') {
         const renderedLines = renderExpanded(ctx, terminalWidth);
-        lines = renderedLines.map(({ line }) => line);
-        // Session token usage (cumulative)
+        const lines = renderedLines.map(({ line }) => line);
         if (ctx.config?.display?.showSessionTokens) {
             const sessionTokensLine = renderSessionTokensLine(ctx);
             if (sessionTokensLine) {
@@ -419,24 +421,33 @@ export function render(ctx) {
                 lines.splice(firstActivityIndex, 0, makeSeparator(separatorWidth));
             }
         }
+        return lines;
     }
-    else {
-        const headerLines = renderCompact(ctx);
-        const activityLines = collectActivityLines(ctx);
-        lines = [...headerLines];
-        if (showSeparators && activityLines.length > 0) {
-            const maxWidth = Math.max(...headerLines.map(visualLength), 20);
-            const separatorWidth = terminalWidth ? Math.min(maxWidth, terminalWidth) : maxWidth;
-            lines.push(makeSeparator(separatorWidth));
-        }
-        lines.push(...activityLines);
+    const headerLines = renderCompact(ctx);
+    const activityLines = collectActivityLines(ctx);
+    const lines = [...headerLines];
+    if (showSeparators && activityLines.length > 0) {
+        const maxWidth = Math.max(...headerLines.map(visualLength), 20);
+        const separatorWidth = terminalWidth ? Math.min(maxWidth, terminalWidth) : maxWidth;
+        lines.push(makeSeparator(separatorWidth));
     }
+    lines.push(...activityLines);
+    return lines;
+}
+export function render(ctx) {
+    const detectedWidth = getTerminalWidth({ preferEnv: true, fallback: UNKNOWN_TERMINAL_WIDTH });
+    const configuredMaxWidth = ctx.config?.maxWidth ?? UNKNOWN_TERMINAL_WIDTH;
+    const terminalWidth = ctx.config?.forceMaxWidth && configuredMaxWidth !== UNKNOWN_TERMINAL_WIDTH
+        ? configuredMaxWidth
+        : (detectedWidth ?? configuredMaxWidth ?? UNKNOWN_TERMINAL_WIDTH);
+    const hasRows = Array.isArray(ctx.config.rows);
+    const lines = hasRows ? renderRows(ctx) : renderLegacyLines(ctx, terminalWidth);
     const physicalLines = lines.flatMap(line => line.split('\n'));
-    // Only wrap when terminal width is real (known). When width is the
-    // UNKNOWN_TERMINAL_WIDTH fallback, wrapping would use an arbitrary value
-    // and produce incorrect line breaks.
     const wrapWidth = terminalWidth !== UNKNOWN_TERMINAL_WIDTH ? (terminalWidth ?? 0) : 0;
-    const visibleLines = physicalLines.flatMap(line => wrapLineToWidth(line, wrapWidth));
+    const rowOverflow = ctx.config.rowOverflow ?? 'wrap';
+    const visibleLines = rowOverflow === 'truncate'
+        ? physicalLines.map(line => wrapWidth > 0 ? truncateToWidth(line, wrapWidth) : line)
+        : physicalLines.flatMap(line => wrapLineToWidth(line, wrapWidth));
     for (const line of visibleLines) {
         const outputLine = `${RESET}${line}`;
         console.log(outputLine);

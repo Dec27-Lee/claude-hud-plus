@@ -1,7 +1,8 @@
 import { isLimitReached } from '../types.js';
 import { getContextPercent, getBufferedPercent, getModelName, formatModelName, getProviderLabel, getTotalTokens, shouldHideUsage } from '../stdin.js';
+import { getRouterModelStatus } from '../plus/router-model.js';
 import { getOutputSpeed } from '../speed-tracker.js';
-import { coloredBar, critical, git as gitColor, gitBranch as gitBranchColor, label, model as modelColor, project as projectColor, getContextColor, getQuotaColor, quotaBar, custom as customColor, RESET } from './colors.js';
+import { coloredBar, critical, git as gitColor, gitBranch as gitBranchColor, label, model as modelColor, project as projectColor, getContextColor, getQuotaColor, quotaBar, custom as customColor, RESET, warning as warningColor } from './colors.js';
 import { getAdaptiveBarWidth } from '../utils/terminal.js';
 import { renderCostEstimate } from './lines/cost.js';
 import { renderPromptCacheLine } from './lines/prompt-cache.js';
@@ -14,7 +15,8 @@ const DEBUG = process.env.DEBUG?.includes('claude-hud') || process.env.DEBUG ===
  * Used for compact layout mode.
  */
 export function renderSessionLine(ctx) {
-    const model = formatModelName(getModelName(ctx.stdin), ctx.config?.display?.modelFormat, ctx.config?.display?.modelOverride);
+    const routerStatus = getRouterModelStatus(ctx.stdin);
+    const model = formatModelName(routerStatus.kind === 'ready' ? routerStatus.info.model : getModelName(ctx.stdin), ctx.config?.display?.modelFormat, ctx.config?.display?.modelOverride);
     const rawPercent = getContextPercent(ctx.stdin);
     const bufferedPercent = getBufferedPercent(ctx.stdin);
     const autocompactMode = ctx.config?.display?.autocompactBuffer ?? 'enabled';
@@ -37,20 +39,25 @@ export function renderSessionLine(ctx) {
     const contextValue = formatContextValue(ctx, percent, contextValueMode);
     const contextValueDisplay = `${getContextColor(percent, colors, contextThresholds)}${contextValue}${RESET}`;
     // Model and context bar (FIRST)
-    const providerLabel = getProviderLabel(ctx.stdin);
+    const providerLabel = routerStatus.kind === 'ready' ? null : getProviderLabel(ctx.stdin);
     const modelQualifier = providerLabel ?? undefined;
-    let modelDisplay = modelQualifier ? `${model} | ${modelQualifier}` : model;
-    if (ctx.effortLevel && ctx.effortSymbol) {
+    let modelDisplay = routerStatus.kind === 'missing-session-state'
+        ? t('status.ccrModelHookMissing')
+        : (modelQualifier ? `${model} | ${modelQualifier}` : model);
+    if (routerStatus.kind !== 'missing-session-state' && ctx.effortLevel && ctx.effortSymbol) {
         modelDisplay += ` ${ctx.effortSymbol} ${ctx.effortLevel}`;
     }
-    else if (ctx.effortLevel) {
+    else if (routerStatus.kind !== 'missing-session-state' && ctx.effortLevel) {
         modelDisplay += ` ${ctx.effortLevel}`;
     }
+    const modelPart = routerStatus.kind === 'missing-session-state'
+        ? warningColor(`[${modelDisplay}]`, colors)
+        : modelColor(`[${modelDisplay}]`, colors);
     if (display?.showModel !== false && display?.showContextBar !== false) {
-        parts.push(`${modelColor(`[${modelDisplay}]`, colors)} ${bar} ${contextValueDisplay}`);
+        parts.push(`${modelPart} ${bar} ${contextValueDisplay}`);
     }
     else if (display?.showModel !== false) {
-        parts.push(`${modelColor(`[${modelDisplay}]`, colors)} ${contextValueDisplay}`);
+        parts.push(`${modelPart} ${contextValueDisplay}`);
     }
     else if (display?.showContextBar !== false) {
         parts.push(`${bar} ${contextValueDisplay}`);

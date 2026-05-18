@@ -18,10 +18,34 @@ export const DEFAULT_ELEMENT_ORDER = [
 export const DEFAULT_MERGE_GROUPS = [
     ['context', 'usage'],
 ];
+export const DEFAULT_ROWS = [
+    ['model', 'contextBar', 'contextValue'],
+    ['project', 'addedDirs', 'git'],
+    ['sessionTokens'],
+];
 const KNOWN_ELEMENTS = new Set(DEFAULT_ELEMENT_ORDER);
+const KNOWN_ROW_ITEMS = new Set([
+    'model',
+    'contextBar',
+    'contextValue',
+    'project',
+    'git',
+    'addedDirs',
+    'sessionTokens',
+    'usage',
+    'promptCache',
+    'memory',
+    'environment',
+    'tools',
+    'agents',
+    'todos',
+    'sessionTime',
+    'customLine',
+]);
 export const DEFAULT_CONFIG = {
     language: 'en',
-    lineLayout: 'expanded',
+    rows: DEFAULT_ROWS.map(row => [...row]),
+    rowOverflow: 'truncate',
     showSeparators: false,
     pathLevels: 1,
     maxWidth: null,
@@ -42,7 +66,7 @@ export const DEFAULT_CONFIG = {
         showAddedDirs: true,
         addedDirsLayout: 'inline',
         showContextBar: true,
-        contextValue: 'percent',
+        contextValue: 'both',
         showConfigCounts: false,
         showCost: false,
         showDuration: false,
@@ -62,7 +86,7 @@ export const DEFAULT_CONFIG = {
         showMemoryUsage: false,
         showPromptCache: false,
         promptCacheTtlSeconds: 300,
-        showSessionTokens: false,
+        showSessionTokens: true,
         showOutputStyle: false,
         showSessionStartDate: false,
         showLastResponseAt: false,
@@ -102,9 +126,6 @@ export function getConfigPath() {
 }
 function validatePathLevels(value) {
     return value === 1 || value === 2 || value === 3;
-}
-function validateLineLayout(value) {
-    return value === 'compact' || value === 'expanded';
 }
 function validateAutocompactBuffer(value) {
     return value === 'enabled' || value === 'disabled';
@@ -179,6 +200,37 @@ function validateElementOrder(value) {
     }
     return elementOrder.length > 0 ? elementOrder : [...DEFAULT_ELEMENT_ORDER];
 }
+function validateRows(value) {
+    if (!Array.isArray(value) || value.length === 0) {
+        return DEFAULT_ROWS.map(row => [...row]);
+    }
+    const rows = [];
+    for (const row of value) {
+        if (!Array.isArray(row)) {
+            continue;
+        }
+        const normalizedRow = [];
+        const seen = new Set();
+        for (const item of row) {
+            if (typeof item !== 'string' || !KNOWN_ROW_ITEMS.has(item)) {
+                continue;
+            }
+            const rowItem = item;
+            if (seen.has(rowItem)) {
+                continue;
+            }
+            seen.add(rowItem);
+            normalizedRow.push(rowItem);
+        }
+        if (normalizedRow.length > 0) {
+            rows.push(normalizedRow);
+        }
+    }
+    return rows.length > 0 ? rows : DEFAULT_ROWS.map(row => [...row]);
+}
+function validateRowOverflow(value) {
+    return value === 'wrap' || value === 'truncate' ? value : DEFAULT_CONFIG.rowOverflow;
+}
 function validateMergeGroups(value) {
     if (!Array.isArray(value)) {
         return DEFAULT_MERGE_GROUPS.map(group => [...group]);
@@ -220,23 +272,12 @@ function validateMergeGroups(value) {
 }
 function migrateConfig(userConfig) {
     const migrated = { ...userConfig };
-    if ('layout' in userConfig && !('lineLayout' in userConfig)) {
+    if ('layout' in userConfig) {
         if (typeof userConfig.layout === 'string') {
-            // Legacy string migration (v0.0.x → v0.1.x)
-            if (userConfig.layout === 'separators') {
-                migrated.lineLayout = 'compact';
-                migrated.showSeparators = true;
-            }
-            else {
-                migrated.lineLayout = 'compact';
-                migrated.showSeparators = false;
-            }
+            migrated.showSeparators = userConfig.layout === 'separators';
         }
         else if (typeof userConfig.layout === 'object' && userConfig.layout !== null) {
-            // Object layout written by third-party tools — extract nested fields
             const obj = userConfig.layout;
-            if (typeof obj.lineLayout === 'string')
-                migrated.lineLayout = obj.lineLayout;
             if (typeof obj.showSeparators === 'boolean')
                 migrated.showSeparators = obj.showSeparators;
             if (typeof obj.pathLevels === 'number')
@@ -282,9 +323,8 @@ export function mergeConfig(userConfig) {
     const language = validateLanguage(migrated.language)
         ? migrated.language
         : DEFAULT_CONFIG.language;
-    const lineLayout = validateLineLayout(migrated.lineLayout)
-        ? migrated.lineLayout
-        : DEFAULT_CONFIG.lineLayout;
+    const rows = validateRows(migrated.rows);
+    const rowOverflow = validateRowOverflow(migrated.rowOverflow);
     const showSeparators = typeof migrated.showSeparators === 'boolean'
         ? migrated.showSeparators
         : DEFAULT_CONFIG.showSeparators;
@@ -469,7 +509,7 @@ export function mergeConfig(userConfig) {
             ? migrated.colors.barEmpty
             : DEFAULT_CONFIG.colors.barEmpty,
     };
-    return { language, lineLayout, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, gitStatus, display, colors };
+    return { language, rows, rowOverflow, showSeparators, pathLevels, maxWidth, forceMaxWidth, elementOrder, gitStatus, display, colors };
 }
 export async function loadConfig() {
     const configPath = getConfigPath();
