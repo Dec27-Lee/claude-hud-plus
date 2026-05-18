@@ -4,10 +4,8 @@ Claude HUD Plus is an enhanced Claude Code statusline based on the official Clau
 
 A Claude Code plugin that shows what's happening — context usage, active tools, running agents, and todo progress. Always visible below your input.
 
-[![License](https://img.shields.io/github/license/Dec27-Lee/claude-hud-plus?v=2)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Dec27-Lee/claude-hud-plus)](https://github.com/Dec27-Lee/claude-hud-plus/stargazers)
+<img width="1846" height="1321" alt="image" src="https://github.com/user-attachments/assets/a53e6597-7029-4d72-8588-947ae8e7fe3f" />
 
-![Claude HUD in action](claude-hud-preview-5-2.png)
 
 > 🌐 English | [中文文档](README.zh.md)
 
